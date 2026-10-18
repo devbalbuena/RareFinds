@@ -7,6 +7,7 @@ import { signInAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useSearchParams } from "next/navigation";
 import { AlertCircle, Lock, Mail, Loader2, ArrowRight } from "lucide-react";
 
 interface SignInFormProps {
@@ -15,6 +16,8 @@ interface SignInFormProps {
 
 export function SignInForm({ callbackUrl = "/account" }: SignInFormProps) {
   const [state, formAction, isPending] = useActionState(signInAction, null);
+  const searchParams = useSearchParams();
+  const isDeactivatedRedirect = searchParams.get("error") === "deactivated";
 
   return (
     <Card className="border shadow-lg">
@@ -31,6 +34,15 @@ export function SignInForm({ callbackUrl = "/account" }: SignInFormProps) {
         <input type="hidden" name="callbackUrl" value={callbackUrl} />
 
         <CardContent className="space-y-4 pt-2">
+          {isDeactivatedRedirect && !state?.error && (
+            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="leading-relaxed font-medium">
+                Your account has been deactivated by an administrator. Please contact support.
+              </div>
+            </div>
+          )}
+
           {state?.error && (
             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />

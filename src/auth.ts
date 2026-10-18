@@ -43,6 +43,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
+        // Check if account has been deactivated
+        if (!user.isActive) {
+          throw new Error("Your account has been deactivated. Please contact an administrator.");
+        }
+
         // Check if user is locked out from too many failed login attempts
         if (user.lockedUntil && new Date(user.lockedUntil) > new Date()) {
           const remainingMinutes = Math.ceil(
@@ -97,6 +102,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           name: user.name,
           email: user.email,
           role: user.role,
+          isActive: user.isActive,
           image: user.image,
         };
       },
