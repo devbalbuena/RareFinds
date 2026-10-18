@@ -24,7 +24,12 @@ async function main() {
 
   // 1. Seed Admin User
   const adminEmail = process.env.INITIAL_ADMIN_EMAIL || "admin@rarefinds.ph";
-  const rawPassword = process.env.INITIAL_ADMIN_PASSWORD || "ChangeMe123!RareFinds";
+  const rawPassword = process.env.INITIAL_ADMIN_PASSWORD;
+  if (!rawPassword) {
+    throw new Error(
+      "Missing INITIAL_ADMIN_PASSWORD environment variable. Please set it in your .env file."
+    );
+  }
   const passwordHash = await bcrypt.hash(rawPassword, 10);
 
   const admin = await prisma.user.upsert({
