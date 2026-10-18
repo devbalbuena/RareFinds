@@ -12,6 +12,7 @@ datasource db {
 
 enum Role {
   CUSTOMER
+  STAFF
   ADMIN
 }
 
@@ -23,6 +24,7 @@ model User {
   image               String?
   passwordHash        String?
   role                Role      @default(CUSTOMER)
+  isActive            Boolean   @default(true)
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
   createdAt           DateTime  @default(now())
@@ -33,6 +35,7 @@ model User {
   orders    Order[]
   cart      Cart?
   addresses Address[]
+  auditLogs AuditLog[]
 
   @@map("users")
 }
@@ -195,11 +198,14 @@ model ProductVariant {
 // -----------------------------------------------------------------------------
 
 enum OrderStatus {
+  PENDING_PAYMENT
   PENDING
   PROCESSING
+  PAID
   SHIPPED
   DELIVERED
   CANCELLED
+  EXPIRED
 }
 
 enum PaymentStatus {
@@ -209,25 +215,33 @@ enum PaymentStatus {
   REFUNDED
 }
 
+enum PaymentMethod {
+  COD
+  TEST
+}
+
 model Order {
   id               String        @id @default(cuid())
-  orderNumber      String        @unique // e.g. "RF-2026-0001"
+  orderNumber      String        @unique // e.g. "RF-20261018-0001"
   userId           String?
   user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   customerEmail    String
   customerName     String
   customerPhone    String?
-  shippingAddress  Json          // Street, Unit, City, Province, PostalCode, Country
+  shippingAddress  Json          // Street, Apartment/Unit, City, Province, PostalCode, Country
   subtotal         Decimal       @db.Decimal(10, 2)
   shippingFee      Decimal       @default(0) @db.Decimal(10, 2)
   totalAmount      Decimal       @db.Decimal(10, 2)
-  status           OrderStatus   @default(PENDING)
+  status           OrderStatus   @default(PENDING_PAYMENT)
   paymentStatus    PaymentStatus @default(UNPAID)
-  paymentMethod    String?       // "paymongo_gcash", "paymongo_card", "paymongo_maya"
-  paymentReference String?       // PayMongo payment intent ID or checkout session ID
+  paymentMethod    PaymentMethod @default(TEST)
+  paymentReference String?       // Payment intent ID, transaction ref, or simulation ref
   trackingNumber   String?
   shippingCarrier  String?       // e.g. "LBC", "J&T Express", "DHL"
   notes            String?       @db.Text
+  expiresAt        DateTime?     // For 15-minute reservation window
+  paidAt           DateTime?
+  cancelledAt      DateTime?
   items            OrderItem[]
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -308,5 +322,47 @@ model Address {
 
   @@index([userId])
   @@map("addresses")
+}
+
+// -----------------------------------------------------------------------------
+// Store Settings (Single-Row Configuration)
+// -----------------------------------------------------------------------------
+
+model StoreSettings {
+  id             String   @id @default("default")
+  storeName      String   @default("RareFinds")
+  storeTagline   String?  @default("Rare & Limited Sneaker Vault")
+  logoUrl        String?
+  contactEmail   String   @default("contact@rarefinds.ph")
+  contactPhone   String?  @default("+63 917 123 4567")
+  address        String?  @default("Manila, Philippines")
+  currency       String   @default("PHP")
+  currencySymbol String   @default("₱")
+  shippingFee    Decimal  @default(0.00) @db.Decimal(10, 2)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("store_settings")
+}
+
+// -----------------------------------------------------------------------------
+// Platform Audit Trail
+// -----------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userEmail  String
+  action     String   // e.g. "ROLE_CHANGE", "USER_DEACTIVATED", "USER_ACTIVATED", "SETTINGS_UPDATED", "USER_CREATED"
+  entityType String   // "User", "StoreSettings", "Product", "Order"
+  entityId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
