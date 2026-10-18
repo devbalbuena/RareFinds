@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { ShieldCheck, Truck, RefreshCw, Sparkles } from "lucide-react";
+import { getStoreSettings } from "@/lib/settings";
 
-export function StoreFooter() {
+export async function StoreFooter() {
+  const settings = await getStoreSettings();
+
   return (
     <footer className="border-t bg-zinc-950 text-zinc-300">
       {/* Reassurance Banner */}
@@ -36,7 +39,7 @@ export function StoreFooter() {
               <Truck className="h-6 w-6" />
             </div>
             <div>
-              <h4 className="text-sm font-semibold text-white">Nationwide PH Delivery</h4>
+              <h4 className="text-sm font-semibold text-white">Nationwide Delivery</h4>
               <p className="text-xs text-zinc-400 mt-1">
                 Double-boxed insured express shipping across Metro Manila and provinces.
               </p>
@@ -61,14 +64,14 @@ export function StoreFooter() {
       <div className="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         <div className="space-y-4">
           <span className="text-xl font-black tracking-tighter uppercase italic text-white">
-            RARE<span className="text-amber-500">FINDS</span>
+            {settings.storeName}
           </span>
           <p className="text-xs text-zinc-400 leading-relaxed">
-            Curated single-vendor destination for rare, archived, and deadstock sneakers.
-            Based in Manila, Philippines.
+            {settings.storeTagline || "Curated single-vendor destination for rare, archived, and deadstock sneakers."}
+            {settings.address ? ` Located in ${settings.address}.` : ""}
           </p>
           <div className="pt-2 text-xs text-zinc-500">
-            Payment via GCash, Maya, and credit/debit cards.
+            Payment via Cash on Delivery, Maya, and Test Simulation.
           </div>
         </div>
 
@@ -84,7 +87,7 @@ export function StoreFooter() {
             </li>
             <li>
               <Link href="/products?sort=rarity" className="hover:text-white transition-colors">
-                Holy Grails & Collabs
+                Holy Grails &amp; Collabs
               </Link>
             </li>
             <li>
@@ -106,7 +109,7 @@ export function StoreFooter() {
           </h4>
           <ul className="space-y-2 text-xs text-zinc-400">
             <li>
-              <span className="font-semibold text-emerald-400">DS (Deadstock):</span> Brand new, unworn, original accessories & box.
+              <span className="font-semibold text-emerald-400">DS (Deadstock):</span> Brand new, unworn, original accessories &amp; box.
             </li>
             <li>
               <span className="font-semibold text-sky-400">VNDS (Very Near DS):</span> Tried on once or near-immaculate condition.
@@ -119,17 +122,18 @@ export function StoreFooter() {
 
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-white mb-4">
-            Security & Support
+            Security &amp; Support
           </h4>
-          <p className="text-xs text-zinc-400 leading-relaxed mb-3">
+          <p className="text-xs text-zinc-400 leading-relaxed mb-2">
             Questions on sizing, condition notes, or physical viewings? Contact store support:
           </p>
-          <p className="text-xs font-mono text-zinc-300">support@rarefinds.ph</p>
+          <p className="text-xs font-mono text-zinc-300">{settings.contactEmail}</p>
+          <p className="text-xs font-mono text-zinc-400 mt-1">{settings.contactPhone}</p>
         </div>
       </div>
 
       <div className="border-t border-zinc-900 py-6 px-4 text-center text-xs text-zinc-500">
-        © {new Date().getFullYear()} RareFinds. All rights reserved. Single-vendor verified sneaker retailer.
+        © {new Date().getFullYear()} {settings.storeName}. All rights reserved. Single-vendor verified authentic retail platform.
       </div>
     </footer>
   );

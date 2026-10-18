@@ -7,14 +7,17 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import prisma from "@/lib/prisma";
 import { auth } from "@/auth";
 
+import { getStoreSettings } from "@/lib/settings";
+
 export async function StoreHeader() {
-  const [brands, session] = await Promise.all([
+  const [brands, session, settings] = await Promise.all([
     prisma.brand.findMany({
       select: { name: true, slug: true },
       orderBy: { name: "asc" },
       take: 6,
     }),
     auth(),
+    getStoreSettings(),
   ]);
 
   return (
@@ -26,7 +29,7 @@ export async function StoreHeader() {
 
           <Link href="/" className="flex items-center gap-2 group">
             <span className="text-xl sm:text-2xl font-black tracking-tighter uppercase italic text-foreground group-hover:text-amber-500 transition-colors">
-              RARE<span className="text-amber-500 group-hover:text-foreground">FINDS</span>
+              {settings.storeName}
             </span>
           </Link>
         </div>

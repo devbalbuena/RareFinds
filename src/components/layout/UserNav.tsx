@@ -71,6 +71,10 @@ export function UserNav({ user }: UserNavProps) {
                 <Badge variant="grail" className="text-[10px] px-1 py-0">
                   ADMIN
                 </Badge>
+              ) : user.role === "STAFF" ? (
+                <Badge variant="default" className="text-[10px] px-1 py-0 bg-blue-500/20 text-blue-400 border-blue-500/30">
+                  STAFF
+                </Badge>
               ) : (
                 <Badge variant="outline" className="text-[10px] px-1 py-0">
                   COLLECTOR
@@ -84,12 +88,12 @@ export function UserNav({ user }: UserNavProps) {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {user.role === "ADMIN" && (
+        {(user.role === "ADMIN" || user.role === "STAFF") && (
           <>
             <DropdownMenuItem asChild>
               <Link href="/admin" className="cursor-pointer gap-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
                 <Shield className="h-3.5 w-3.5" />
-                Admin Dashboard
+                Staff / Admin Portal
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

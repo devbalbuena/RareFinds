@@ -12,11 +12,15 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "RareFinds | Rare & Limited Sneaker Vault",
-  description:
-    "Curated single-vendor authenticated rare, deadstock, and archival sneakers in the Philippines. Every pair hand-inspected and guaranteed 100% authentic.",
-};
+import { getStoreSettings } from "@/lib/settings";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getStoreSettings();
+  return {
+    title: `${settings.storeName} | ${settings.storeTagline || "Rare & Limited Sneaker Vault"}`,
+    description: `Curated single-vendor authenticated rare, deadstock, and archival sneakers. Official store for ${settings.storeName}.`,
+  };
+}
 
 export default function RootLayout({
   children,
