@@ -7,12 +7,14 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatPrice(
   amount: number | string | { toString: () => string },
-  currency: string = "PHP"
+  currencySymbol: string = "₱"
 ) {
   const numericAmount = typeof amount === "number" ? amount : Number(amount.toString());
-  return new Intl.NumberFormat("en-PH", {
-    style: "currency",
-    currency: currency,
+  if (isNaN(numericAmount)) return `${currencySymbol}0`;
+  const formattedNumber = new Intl.NumberFormat("en-US", {
     maximumFractionDigits: 0,
   }).format(numericAmount);
+
+  const symbol = currencySymbol === "PHP" ? "₱" : currencySymbol;
+  return `${symbol}${formattedNumber}`;
 }
