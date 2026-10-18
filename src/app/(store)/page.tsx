@@ -19,8 +19,21 @@ export default async function HomePage() {
     <div className="flex flex-col gap-16 pb-20">
       {/* Hero Section */}
       <section className="relative overflow-hidden bg-zinc-950 text-white border-b border-zinc-900">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(217,119,6,0.15),rgba(255,255,255,0))]" />
-        
+        {/* Background Video Layer (Autoplays /videos/hero.mp4 from public folder) */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover opacity-80 pointer-events-none"
+        >
+          <source src="/videos/hero.mp4" type="video/mp4" />
+        </video>
+
+        {/* Ambient Dark Gradient & Vignette Overlays for Maximum Contrast */}
+        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/60 to-zinc-950/40 pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(217,119,6,0.15),rgba(255,255,255,0))] pointer-events-none" />
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 relative z-10 flex flex-col items-center text-center">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900/90 border border-amber-500/30 text-amber-400 text-xs font-semibold mb-6 tracking-wider uppercase">
             <Sparkles className="h-3.5 w-3.5" />
