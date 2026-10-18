@@ -53,6 +53,27 @@ export default async function ProductDetailPage(props: ProductDetailPageProps) {
     product.variants.length > 0 &&
     product.variants.every((v) => v.isSold || v.stockQty <= 0);
 
+  // Serialize to plain JSON objects (strip Decimal and Date instances) for Client Components
+  const serializedVariants = product.variants.map((v) => ({
+    id: v.id,
+    size: v.size,
+    condition: v.condition,
+    conditionNotes: v.conditionNotes,
+    price: Number(v.price),
+    costPrice: v.costPrice ? Number(v.costPrice) : null,
+    stockQty: v.stockQty,
+    isOneOfOne: v.isOneOfOne,
+    isSold: v.isSold,
+    reservedUntil: v.reservedUntil ? v.reservedUntil.toISOString() : null,
+  }));
+
+  const serializedImages = product.images.map((img) => ({
+    id: img.id,
+    url: img.url,
+    altText: img.altText,
+    isPrimary: img.isPrimary,
+  }));
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
       {/* Breadcrumb Navigation */}
@@ -83,7 +104,7 @@ export default async function ProductDetailPage(props: ProductDetailPageProps) {
         <div className="lg:col-span-6 xl:col-span-7">
           <div className="sticky top-24">
             <ProductImageGallery
-              images={product.images}
+              images={serializedImages}
               title={product.title}
               rarity={product.rarity}
               isSoldOut={isSoldOut}
@@ -134,7 +155,7 @@ export default async function ProductDetailPage(props: ProductDetailPageProps) {
           </div>
 
           {/* Interactive Variant & Sizing Selector */}
-          <ProductVariantSelector variants={product.variants} />
+          <ProductVariantSelector variants={serializedVariants} />
 
           {/* Authenticity Guarantee Card */}
           <AuthenticityCard notes={product.authenticityNotes} />

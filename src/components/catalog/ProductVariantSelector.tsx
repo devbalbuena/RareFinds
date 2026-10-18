@@ -1,17 +1,20 @@
 "use client";
 
 import * as React from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { formatPrice } from "@/lib/utils";
 import { Condition } from "@prisma/client";
-import { ShoppingBag, Lock, Sparkles, AlertCircle } from "lucide-react";
+import {
+  ShoppingBag,
+  Lock,
+  Sparkles,
+  AlertCircle,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
+import { addToCartAction } from "@/actions/cart";
 
 interface Variant {
   id: string;
@@ -35,9 +38,15 @@ const emptySubscribe = () => () => {};
 export function ProductVariantSelector({
   variants,
 }: ProductVariantSelectorProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [selectedId, setSelectedId] = React.useState<string>(
     variants[0]?.id || ""
   );
+  const [isPending, setIsPending] = React.useState(false);
+  const [actionError, setActionError] = React.useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = React.useState<string | null>(null);
 
   const now = React.useSyncExternalStore(
     emptySubscribe,
@@ -65,6 +74,37 @@ export function ProductVariantSelector({
     DS: { label: "Deadstock (Brand New)", badgeVariant: "ds" },
     VNDS: { label: "Very Near Deadstock", badgeVariant: "vnds" },
     USED: { label: "Pre-Owned / Graded", badgeVariant: "used" },
+  };
+
+  const handleAddToCart = async () => {
+    setActionError(null);
+    setActionSuccess(null);
+    setIsPending(true);
+
+    try {
+      const res = await addToCartAction(selectedVariant.id);
+
+      if (res.requiresLogin) {
+        const callbackUrl = encodeURIComponent(pathname);
+        router.push(`/sign-in?callbackUrl=${callbackUrl}`);
+        return;
+      }
+
+      if (res.error) {
+        setActionError(res.message);
+        return;
+      }
+
+      if (res.success) {
+        setActionSuccess(res.message || "Added to cart!");
+        // Dispatch cart:updated event to notify CartDrawer
+        window.dispatchEvent(new CustomEvent("cart:updated"));
+      }
+    } catch {
+      setActionError("Failed to add sneaker to cart. Please try again.");
+    } finally {
+      setIsPending(false);
+    }
   };
 
   return (
@@ -128,7 +168,11 @@ export function ProductVariantSelector({
               <button
                 key={variant.id}
                 type="button"
-                onClick={() => setSelectedId(variant.id)}
+                onClick={() => {
+                  setSelectedId(variant.id);
+                  setActionError(null);
+                  setActionSuccess(null);
+                }}
                 className={`relative flex flex-col items-center justify-center min-w-[72px] h-14 px-3 rounded-lg border text-xs font-medium transition-all cursor-pointer ${
                   isSelected
                     ? "border-primary bg-primary text-primary-foreground font-bold shadow-xs ring-2 ring-primary ring-offset-2"
@@ -157,27 +201,44 @@ export function ProductVariantSelector({
         </div>
       )}
 
-      {/* Add to Cart Button (Disabled with Tooltip as requested) */}
+      {/* Feedback Messages */}
+      {actionError && (
+        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs animate-in fade-in">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="font-medium">{actionError}</div>
+        </div>
+      )}
+
+      {actionSuccess && (
+        <div className="flex items-start gap-2.5 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs animate-in fade-in">
+          <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+          <div className="font-medium">{actionSuccess}</div>
+        </div>
+      )}
+
+      {/* Add to Cart Button */}
       <div className="pt-2">
-        <TooltipProvider delayDuration={100}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="w-full">
-                <Button
-                  disabled
-                  size="lg"
-                  className="w-full h-12 text-base font-bold gap-2 cursor-not-allowed opacity-60"
-                >
-                  <ShoppingBag className="h-5 w-5" />
-                  {isSold ? "Item Sold" : "Add to Cart"}
-                </Button>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="text-xs">
-              Shopping cart and checkout functionality coming soon in Phase 3 & 4!
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          type="button"
+          onClick={handleAddToCart}
+          disabled={isSold || isPending}
+          size="lg"
+          className="w-full h-12 text-base font-bold gap-2 cursor-pointer shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isPending ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Adding to Vault Cart...
+            </span>
+          ) : isSold ? (
+            "Item Sold Out"
+          ) : (
+            <span className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5" />
+              Add to Cart • {formatPrice(selectedVariant.price)}
+            </span>
+          )}
+        </Button>
 
         <p className="text-[11px] text-center text-muted-foreground mt-2">
           Includes free double-boxed insured shipping & authenticity card
