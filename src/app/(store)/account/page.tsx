@@ -59,6 +59,10 @@ export default async function AccountPage() {
               <Badge variant="grail" className="text-xs">
                 ADMIN
               </Badge>
+            ) : user.role === "STAFF" ? (
+              <Badge variant="default" className="text-xs bg-blue-500/20 text-blue-400 border-blue-500/30">
+                STAFF
+              </Badge>
             ) : (
               <Badge variant="secondary" className="text-xs">
                 VERIFIED COLLECTOR
@@ -72,13 +76,13 @@ export default async function AccountPage() {
 
         {/* Quick Links */}
         <div className="flex items-center gap-3">
-          {user.role === "ADMIN" && (
+          {(user.role === "ADMIN" || user.role === "STAFF") && (
             <Link
               href="/admin"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 text-xs font-bold hover:bg-amber-500/20 transition-colors"
             >
               <Shield className="h-3.5 w-3.5" />
-              Admin Dashboard
+              Staff / Admin Portal
             </Link>
           )}
           <Link

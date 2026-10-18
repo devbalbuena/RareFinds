@@ -8,7 +8,7 @@ import {
   Trash2,
   AlertTriangle,
   Loader2,
-  Lock,
+  ArrowRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -276,18 +276,28 @@ export function CartDrawer() {
               Shipping & taxes calculated at checkout. 1-of-1 inventory holds begin during checkout step.
             </p>
 
-            {/* Checkout Button (Disabled until Phase 4 per rules) */}
+            {/* Checkout Button (Enabled in Phase 4) */}
             <div className="space-y-2">
-              <Button
-                disabled
-                className="w-full h-11 text-sm font-bold gap-2 cursor-not-allowed opacity-60"
-              >
-                <Lock className="h-4 w-4" />
-                Proceed to Checkout (Phase 4)
-              </Button>
-              <p className="text-[10px] text-center text-muted-foreground italic">
-                Checkout & PayMongo payment integration will be unlocked in Phase 4.
-              </p>
+              {items.some((item) => item.isUnavailable) ? (
+                <Button
+                  disabled
+                  className="w-full h-11 text-sm font-bold gap-2 opacity-60 cursor-not-allowed"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  Remove Unavailable Pairs to Checkout
+                </Button>
+              ) : (
+                <Button
+                  asChild
+                  onClick={() => setOpen(false)}
+                  className="w-full h-11 text-sm font-bold gap-2 bg-amber-500 hover:bg-amber-600 text-black shadow-md shadow-amber-500/20"
+                >
+                  <Link href="/checkout">
+                    Proceed to Checkout
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         )}
