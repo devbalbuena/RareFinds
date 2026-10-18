@@ -1,0 +1,743 @@
+"use client";
+
+import * as React from "react";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
+import {
+  ShieldCheck,
+  Truck,
+  CreditCard,
+  Banknote,
+  AlertCircle,
+  Loader2,
+  Lock,
+  Plus,
+  Clock,
+  Globe,
+  MapPin,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { formatPrice } from "@/lib/utils";
+import { placeOrderAction } from "@/actions/orders";
+import {
+  COUNTRIES,
+  PHILIPPINES_REGIONS,
+} from "@/lib/constants/philippines-addresses";
+
+interface SerializedAddress {
+  id: string;
+  fullName: string;
+  phone: string;
+  street: string;
+  apartment?: string | null;
+  city: string;
+  province: string;
+  postalCode: string;
+  isDefault: boolean;
+}
+
+interface SerializedCartItem {
+  id: string;
+  variantId: string;
+  quantity: number;
+  price: number;
+  size: string;
+  condition: string;
+  isOneOfOne: boolean;
+  product: {
+    id: string;
+    title: string;
+    slug: string;
+    brandName: string;
+    imageUrl: string;
+  };
+}
+
+interface CheckoutFormProps {
+  savedAddresses: SerializedAddress[];
+  cartItems: SerializedCartItem[];
+  subtotal: number;
+  shippingFee?: number;
+  currencySymbol?: string;
+  storeName?: string;
+  userEmail: string;
+  userName: string;
+}
+
+export function CheckoutForm({
+  savedAddresses,
+  cartItems,
+  subtotal,
+  shippingFee = 0,
+  currencySymbol = "₱",
+  storeName = "RareFinds",
+  userEmail,
+  userName,
+}: CheckoutFormProps) {
+  const router = useRouter();
+  const errorRef = React.useRef<HTMLDivElement>(null);
+
+  const totalAmount = subtotal + shippingFee;
+
+  // Address selection state
+  const defaultAddress = savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
+  const [selectedAddressId, setSelectedAddressId] = React.useState<string>(
+    defaultAddress ? defaultAddress.id : "new"
+  );
+
+  // Cascading Philippine address states
+  const initialRegion = PHILIPPINES_REGIONS[0]; // NCR
+  const [selectedCountry, setSelectedCountry] = React.useState<string>("PH");
+  const [selectedRegionId, setSelectedRegionId] = React.useState<string>(initialRegion.id);
+  const [selectedCity, setSelectedCity] = React.useState<string>(initialRegion.cities[0]);
+  const [customCity, setCustomCity] = React.useState<string>("");
+
+  // New address form state
+  const [newAddress, setNewAddress] = React.useState({
+    fullName: userName || "",
+    phone: "",
+    street: "",
+    apartment: "",
+    city: initialRegion.cities[0],
+    province: initialRegion.name,
+    postalCode: "",
+    saveToAccount: true,
+  });
+
+  // Handle region dropdown change
+  const handleRegionChange = (regionId: string) => {
+    setSelectedRegionId(regionId);
+    const reg = PHILIPPINES_REGIONS.find((r) => r.id === regionId) || initialRegion;
+    const firstCity = reg.cities[0] || "";
+    setSelectedCity(firstCity);
+    setCustomCity("");
+    setNewAddress((prev) => ({
+      ...prev,
+      province: reg.name,
+      city: firstCity,
+    }));
+  };
+
+  // Handle city dropdown change
+  const handleCityChange = (cityName: string) => {
+    setSelectedCity(cityName);
+    if (cityName !== "__custom__") {
+      setNewAddress((prev) => ({
+        ...prev,
+        city: cityName,
+      }));
+    } else {
+      setNewAddress((prev) => ({
+        ...prev,
+        city: customCity || "",
+      }));
+    }
+  };
+
+  // Payment method state
+  const [paymentMethod, setPaymentMethod] = React.useState<"TEST" | "COD">("TEST");
+  const [orderNotes, setOrderNotes] = React.useState("");
+
+  // Submission state
+  const [isPending, setIsPending] = React.useState(false);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
+  const handlePlaceOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setIsPending(true);
+
+    try {
+      const resolvedCity =
+        selectedCity === "__custom__" ? customCity.trim() : newAddress.city.trim();
+
+      if (!resolvedCity && selectedAddressId === "new") {
+        setErrorMessage("Please enter a valid City / Municipality.");
+        setIsPending(false);
+        return;
+      }
+
+      const payload = {
+        paymentMethod,
+        notes: orderNotes.trim() || undefined,
+        ...(selectedAddressId !== "new"
+          ? { addressId: selectedAddressId }
+          : {
+              newAddress: {
+                fullName: newAddress.fullName.trim(),
+                phone: newAddress.phone.trim(),
+                street: newAddress.street.trim(),
+                apartment: newAddress.apartment?.trim() || undefined,
+                city: resolvedCity,
+                province: newAddress.province.trim(),
+                postalCode: newAddress.postalCode.trim(),
+                saveToAccount: newAddress.saveToAccount,
+              },
+            }),
+      };
+
+      const res = await placeOrderAction(payload);
+
+      if (res.requiresLogin) {
+        router.push("/sign-in?callbackUrl=/checkout");
+        return;
+      }
+
+      if (res.error) {
+        setErrorMessage(res.error);
+        setIsPending(false);
+        setTimeout(() => {
+          errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 50);
+        return;
+      }
+
+      if (res.success && res.orderId) {
+        // Broadcast custom event so cart drawer updates count immediately
+        window.dispatchEvent(new CustomEvent("cart:updated"));
+        // Force full page navigation to order success page
+        window.location.href = `/order-success/${res.orderId}`;
+        return;
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setErrorMessage(msg);
+      setIsPending(false);
+      setTimeout(() => {
+        errorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 50);
+    }
+  };
+
+  return (
+    <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+      {/* Left Column: Shipping & Payment Steps (7 cols) */}
+      <div className="lg:col-span-7 space-y-8">
+        {/* Error Alert */}
+        {errorMessage && (
+          <div
+            ref={errorRef}
+            className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm flex items-start gap-3"
+          >
+            <AlertCircle className="h-5 w-5 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <div className="font-bold">Checkout Issue</div>
+              <p className="text-xs leading-relaxed">{errorMessage}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Shipping Destination */}
+        <Card>
+          <CardHeader className="border-b pb-4">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+              <Truck className="h-4 w-4 text-primary" />
+              1. Delivery Address
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            {savedAddresses.length > 0 && (
+              <div className="space-y-3">
+                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Select Saved Address
+                </div>
+
+                <div className="grid grid-cols-1 gap-3">
+                  {savedAddresses.map((addr) => (
+                    <label
+                      key={addr.id}
+                      className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                        selectedAddressId === addr.id
+                          ? "border-primary bg-primary/5 shadow-xs"
+                          : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="addressSelection"
+                        value={addr.id}
+                        checked={selectedAddressId === addr.id}
+                        onChange={() => setSelectedAddressId(addr.id)}
+                        className="mt-1 h-4 w-4 text-primary accent-primary"
+                      />
+                      <div className="flex-1 text-xs space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-foreground">{addr.fullName}</span>
+                          {addr.isDefault && (
+                            <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-muted-foreground">{addr.street}</p>
+                        {addr.apartment && <p className="text-muted-foreground">{addr.apartment}</p>}
+                        <p className="text-muted-foreground">
+                          {addr.city}, {addr.province} {addr.postalCode}
+                        </p>
+                        <p className="font-mono text-[11px] text-zinc-500 pt-0.5">
+                          Phone: {addr.phone}
+                        </p>
+                      </div>
+                    </label>
+                  ))}
+
+                  {/* Option for new address */}
+                  <label
+                    className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
+                      selectedAddressId === "new"
+                        ? "border-primary bg-primary/5 shadow-xs"
+                        : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="addressSelection"
+                      value="new"
+                      checked={selectedAddressId === "new"}
+                      onChange={() => setSelectedAddressId("new")}
+                      className="h-4 w-4 text-primary accent-primary"
+                    />
+                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+                      <Plus className="h-3.5 w-3.5" />
+                      Add a New Shipping Address
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* New Address Inputs Form (shown if "new" is selected or no saved addresses) */}
+            {(selectedAddressId === "new" || savedAddresses.length === 0) && (() => {
+              const currentRegion =
+                PHILIPPINES_REGIONS.find((r) => r.id === selectedRegionId) ||
+                PHILIPPINES_REGIONS[0];
+
+              return (
+                <div className="pt-2 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Recipient Full Name */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Recipient Full Name *
+                      </label>
+                      <Input
+                        required
+                        value={newAddress.fullName}
+                        onChange={(e) =>
+                          setNewAddress({ ...newAddress, fullName: e.target.value })
+                        }
+                        placeholder="Juan Dela Cruz"
+                        className="h-10 text-xs"
+                      />
+                    </div>
+
+                    {/* Contact Phone Number */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Contact Phone Number *
+                      </label>
+                      <Input
+                        required
+                        type="tel"
+                        value={newAddress.phone}
+                        onChange={(e) =>
+                          setNewAddress({ ...newAddress, phone: e.target.value })
+                        }
+                        placeholder="0917 123 4567"
+                        className="h-10 text-xs"
+                      />
+                    </div>
+
+                    {/* Country / Territory Dropdown */}
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Globe className="h-3.5 w-3.5 text-primary" />
+                          Country / Territory *
+                        </span>
+                        <span className="text-[10px] text-amber-500 font-medium">
+                          Philippines Only (Others Available Soon)
+                        </span>
+                      </label>
+                      <select
+                        value={selectedCountry}
+                        onChange={(e) => setSelectedCountry(e.target.value)}
+                        className="w-full h-10 rounded-md border border-input bg-background px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        {COUNTRIES.map((country) => (
+                          <option
+                            key={country.code}
+                            value={country.code}
+                            disabled={!country.available}
+                            className={!country.available ? "text-muted-foreground bg-muted/30" : "font-medium"}
+                          >
+                            {country.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Province / Administrative Region Dropdown */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                        Province / Administrative Region *
+                      </label>
+                      <select
+                        value={selectedRegionId}
+                        onChange={(e) => handleRegionChange(e.target.value)}
+                        className="w-full h-10 rounded-md border border-input bg-background px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        {PHILIPPINES_REGIONS.map((region) => (
+                          <option key={region.id} value={region.id}>
+                            {region.designation} — {region.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* City / Municipality Cascading Dropdown */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                        City / Municipality *
+                      </label>
+                      <select
+                        value={selectedCity}
+                        onChange={(e) => handleCityChange(e.target.value)}
+                        className="w-full h-10 rounded-md border border-input bg-background px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        {currentRegion.cities.map((city) => (
+                          <option key={city} value={city}>
+                            {city}
+                          </option>
+                        ))}
+                        <option value="__custom__">Other City / Municipality (Type Manually)</option>
+                      </select>
+                    </div>
+
+                    {/* Custom City Name Input (Shown when __custom__ is picked) */}
+                    {selectedCity === "__custom__" && (
+                      <div className="sm:col-span-2 space-y-1.5">
+                        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                          Enter Specific City / Municipality Name *
+                        </label>
+                        <Input
+                          required
+                          value={customCity}
+                          onChange={(e) => {
+                            setCustomCity(e.target.value);
+                            setNewAddress((prev) => ({ ...prev, city: e.target.value }));
+                          }}
+                          placeholder="Type your city or municipality name"
+                          className="h-10 text-xs"
+                        />
+                      </div>
+                    )}
+
+                    {/* Street Address & Building */}
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Street Address & Building *
+                      </label>
+                      <Input
+                        required
+                        value={newAddress.street}
+                        onChange={(e) =>
+                          setNewAddress({ ...newAddress, street: e.target.value })
+                        }
+                        placeholder="e.g. 123 Ayala Avenue, Tower 1 or Street / Purok"
+                        className="h-10 text-xs"
+                      />
+                    </div>
+
+                    {/* Unit / Apartment / Barangay (Optional) */}
+                    <div className="sm:col-span-2 space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Unit / Apartment / Barangay (Optional)
+                      </label>
+                      <Input
+                        value={newAddress.apartment}
+                        onChange={(e) =>
+                          setNewAddress({ ...newAddress, apartment: e.target.value })
+                        }
+                        placeholder="Unit 14B, Purok 5, Brgy. San Lorenzo"
+                        className="h-10 text-xs"
+                      />
+                    </div>
+
+                    {/* Postal / ZIP Code */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Postal / ZIP Code *
+                      </label>
+                      <Input
+                        required
+                        value={newAddress.postalCode}
+                        onChange={(e) =>
+                          setNewAddress({ ...newAddress, postalCode: e.target.value })
+                        }
+                        placeholder="e.g. 1200 or 8600"
+                        className="h-10 text-xs"
+                      />
+                    </div>
+
+                    {/* Save Address to Account Checkbox */}
+                    <div className="sm:col-span-2 flex items-center gap-2 pt-2">
+                      <Checkbox
+                        id="saveAddressCheckbox"
+                        checked={newAddress.saveToAccount}
+                        onCheckedChange={(checked) =>
+                          setNewAddress({ ...newAddress, saveToAccount: !!checked })
+                        }
+                      />
+                      <label
+                        htmlFor="saveAddressCheckbox"
+                        className="text-xs text-foreground cursor-pointer select-none font-medium"
+                      >
+                        Save this address to my account for faster future orders
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </CardContent>
+        </Card>
+
+        {/* Step 2: Payment Method */}
+        <Card>
+          <CardHeader className="border-b pb-4">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-primary" />
+              2. Payment Method
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Option 1: TEST PAYMENT */}
+              <label
+                className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                  paymentMethod === "TEST"
+                    ? "border-amber-500 bg-amber-500/5 ring-1 ring-amber-500 shadow-xs"
+                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="TEST"
+                      checked={paymentMethod === "TEST"}
+                      onChange={() => setPaymentMethod("TEST")}
+                      className="h-4 w-4 text-amber-500 accent-amber-500"
+                    />
+                    <span className="font-bold text-xs uppercase tracking-wide text-foreground">
+                      Test Simulation
+                    </span>
+                  </div>
+                  <Badge variant="grail" className="text-[10px] px-1.5 py-0 h-4 gap-1">
+                    <Clock className="h-2.5 w-2.5" />
+                    15-Min Hold
+                  </Badge>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                  Instantly reserves your 1-of-1 pair for 15 minutes. Simulates checkout without a live credit card.
+                </p>
+              </label>
+
+              {/* Option 2: COD */}
+              <label
+                className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                  paymentMethod === "COD"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
+                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="COD"
+                      checked={paymentMethod === "COD"}
+                      onChange={() => setPaymentMethod("COD")}
+                      className="h-4 w-4 text-primary accent-primary"
+                    />
+                    <span className="font-bold text-xs uppercase tracking-wide text-foreground flex items-center gap-1.5">
+                      <Banknote className="h-3.5 w-3.5 text-emerald-500" />
+                      Cash on Delivery
+                    </span>
+                  </div>
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                    Instant Allocation
+                  </Badge>
+                </div>
+
+                <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                  Pay cash upon personal courier inspection. Your pair is immediately allocated and marked sold.
+                </p>
+              </label>
+            </div>
+
+            {/* Delivery Instructions / Order Notes */}
+            <div className="pt-2 space-y-1.5">
+              <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                Special Delivery Notes (Optional)
+              </label>
+              <textarea
+                value={orderNotes}
+                onChange={(e) => setOrderNotes(e.target.value)}
+                rows={2}
+                placeholder="Leave with concierge, gate code, or preferred call time..."
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Right Column: Order Summary & Placement (5 cols) */}
+      <div className="lg:col-span-5">
+        <div className="sticky top-24 space-y-6">
+          <Card className="border shadow-md">
+            <CardHeader className="border-b pb-4">
+              <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center justify-between">
+                <span>Vault Order Summary</span>
+                <span className="text-xs font-normal text-muted-foreground">
+                  {cartItems.length} {cartItems.length === 1 ? "pair" : "pairs"}
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              {/* Item List */}
+              <div className="space-y-4 max-h-[360px] overflow-y-auto pr-1">
+                {cartItems.map((item) => (
+                  <div key={item.id} className="flex gap-3 text-xs">
+                    <div className="relative h-16 w-16 rounded-lg border bg-secondary/30 shrink-0 overflow-hidden">
+                      <Image
+                        src={item.product.imageUrl}
+                        alt={item.product.title}
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 space-y-1">
+                      <div className="font-bold text-foreground leading-tight line-clamp-1">
+                        {item.product.title}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+                        <span>Size US {item.size}</span>
+                        <span>•</span>
+                        <span>{item.condition}</span>
+                      </div>
+                      <div className="flex items-center justify-between pt-0.5">
+                        <span className="font-mono text-xs font-bold text-foreground">
+                          {formatPrice(item.price)}
+                        </span>
+                        {item.isOneOfOne && (
+                          <span className="text-[10px] text-amber-500 font-bold uppercase">
+                            1-of-1
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Price Calculation breakdown */}
+              <div className="border-t pt-4 space-y-2 text-xs">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="font-medium text-foreground">{formatPrice(subtotal, currencySymbol)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span className="flex items-center gap-1">
+                    Insured Express Shipping
+                    <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                  </span>
+                  {shippingFee > 0 ? (
+                    <span className="font-semibold text-foreground">{formatPrice(shippingFee, currencySymbol)}</span>
+                  ) : (
+                    <span className="text-emerald-500 font-semibold">FREE</span>
+                  )}
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>100% Authenticity Guarantee</span>
+                  <span className="text-foreground font-semibold">Included</span>
+                </div>
+
+                <div className="border-t pt-3 flex items-baseline justify-between">
+                  <span className="text-sm font-bold uppercase tracking-wider text-foreground">
+                    Total Amount
+                  </span>
+                  <span className="text-xl font-black text-foreground">
+                    {formatPrice(totalAmount, currencySymbol)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Guarantee badges */}
+              <div className="rounded-lg bg-secondary/50 p-3 space-y-1.5 text-[11px] text-muted-foreground border">
+                <div className="flex items-center gap-2 font-semibold text-foreground">
+                  <ShieldCheck className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <span>{storeName} Single-Vendor Guarantee</span>
+                </div>
+                <p className="leading-relaxed">
+                  Every sneaker is inspected in Manila. Exact 1-of-1 pair photographed is shipped double-boxed with serialized authenticity seal.
+                </p>
+              </div>
+
+              {userEmail && (
+                <div className="text-[11px] text-muted-foreground text-center">
+                  Order updates sent to <span className="font-semibold text-foreground">{userEmail}</span>
+                </div>
+              )}
+
+              {/* Inline Error Alert near Submit Button */}
+              {errorMessage && (
+                <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs flex items-start gap-2.5 animate-in fade-in">
+                  <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5 flex-1">
+                    <span className="font-bold block">Unable to place order</span>
+                    <span className="leading-relaxed text-[11px]">{errorMessage}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Submit Button */}
+              <Button
+                type="submit"
+                disabled={isPending}
+                size="lg"
+                className="w-full font-bold text-sm tracking-wide bg-amber-500 hover:bg-amber-600 text-black shadow-lg shadow-amber-500/25 h-12 gap-2 cursor-pointer"
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Securing Your Grails...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="h-4 w-4" />
+                    Place Order &amp; Reserve • {formatPrice(totalAmount, currencySymbol)}
+                  </>
+                )}
+              </Button>
+
+              <p className="text-[10px] text-center text-muted-foreground">
+                By placing your order, you agree to RareFinds Terms of Authenticity and 1-of-1 Vault reservation rules.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </form>
+  );
+}
