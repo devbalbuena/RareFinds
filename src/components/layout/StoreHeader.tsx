@@ -1,17 +1,21 @@
 import * as React from "react";
 import Link from "next/link";
-import { ShoppingBag } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { SearchInput } from "./SearchInput";
 import { MobileNav } from "./MobileNav";
+import { UserNav } from "./UserNav";
+import { CartDrawer } from "@/components/cart/CartDrawer";
 import prisma from "@/lib/prisma";
+import { auth } from "@/auth";
 
 export async function StoreHeader() {
-  const brands = await prisma.brand.findMany({
-    select: { name: true, slug: true },
-    orderBy: { name: "asc" },
-    take: 6,
-  });
+  const [brands, session] = await Promise.all([
+    prisma.brand.findMany({
+      select: { name: true, slug: true },
+      orderBy: { name: "asc" },
+      take: 6,
+    }),
+    auth(),
+  ]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-all">
@@ -55,26 +59,19 @@ export async function StoreHeader() {
           </Link>
         </nav>
 
-        {/* Right: Search & Cart */}
-        <div className="flex items-center gap-2 sm:gap-4">
-          <div className="hidden sm:block w-48 md:w-64 lg:w-80">
+        {/* Right: Search, Cart & User Menu */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden sm:block w-40 md:w-56 lg:w-72">
             <React.Suspense fallback={<div className="h-9 bg-muted rounded-full animate-pulse" />}>
               <SearchInput />
             </React.Suspense>
           </div>
 
-          {/* Cart Icon (Static for Phase 2, shows 0) */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative"
-            aria-label="Shopping bag"
-          >
-            <ShoppingBag className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-              0
-            </span>
-          </Button>
+          {/* User Account Menu / Sign In */}
+          <UserNav user={session?.user} />
+
+          {/* Live Cart Drawer */}
+          <CartDrawer />
         </div>
       </div>
 
