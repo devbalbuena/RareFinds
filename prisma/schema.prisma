@@ -16,19 +16,23 @@ enum Role {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String?
-  role          Role      @default(CUSTOMER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                  String    @id @default(cuid())
+  name                String?
+  email               String    @unique
+  emailVerified       DateTime?
+  image               String?
+  passwordHash        String?
+  role                Role      @default(CUSTOMER)
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  accounts Account[]
-  sessions Session[]
-  orders   Order[]
+  accounts  Account[]
+  sessions  Session[]
+  orders    Order[]
+  cart      Cart?
+  addresses Address[]
 
   @@map("users")
 }
@@ -176,6 +180,7 @@ model ProductVariant {
   reservedUntil  DateTime?   // Checkout hold expiration (e.g. 15-minute checkout lock)
   reservedBy     String?     // Checkout session or user ID holding reservation
   orderItems     OrderItem[]
+  cartItems      CartItem[]
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
@@ -250,3 +255,58 @@ model OrderItem {
   @@index([variantId])
   @@map("order_items")
 }
+
+// -----------------------------------------------------------------------------
+// Shopping Cart
+// -----------------------------------------------------------------------------
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@map("carts")
+}
+
+model CartItem {
+  id        String         @id @default(cuid())
+  cartId    String
+  cart      Cart           @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Int            @default(1)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@unique([cartId, variantId])
+  @@index([cartId])
+  @@index([variantId])
+  @@map("cart_items")
+}
+
+// -----------------------------------------------------------------------------
+// Customer Shipping Addresses
+// -----------------------------------------------------------------------------
+
+model Address {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName   String
+  phone      String
+  street     String
+  apartment  String?
+  city       String
+  province   String
+  postalCode String
+  isDefault  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId])
+  @@map("addresses")
+}
+
