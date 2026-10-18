@@ -48,6 +48,25 @@ async function main() {
 
   console.log(`✅ Seeded Admin User: ${admin.email} (ID: ${admin.id})`);
 
+  // 1b. Seed Default Store Settings
+  const settings = await prisma.storeSettings.upsert({
+    where: { id: "default" },
+    update: {},
+    create: {
+      id: "default",
+      storeName: "RareFinds",
+      storeTagline: "Rare & Limited Sneaker Vault",
+      logoUrl: null,
+      contactEmail: "contact@rarefinds.ph",
+      contactPhone: "+63 917 123 4567",
+      address: "Manila, Philippines",
+      currency: "PHP",
+      currencySymbol: "₱",
+      shippingFee: 0,
+    },
+  });
+  console.log(`✅ Seeded Store Settings: ${settings.storeName}`);
+
   // 2. Seed Brands
   const brandsData = [
     {
