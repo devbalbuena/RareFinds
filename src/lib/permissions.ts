@@ -24,6 +24,8 @@ export type Permission =
   // Store Branding & Configuration (ADMIN only)
   | "settings:view"
   | "settings:update"
+  // Brand & Category Catalog (ADMIN only)
+  | "catalog:manage"
   // Audit Trail (ADMIN only)
   | "audit:view";
 
@@ -62,6 +64,7 @@ const ROLE_PERMISSIONS: Record<Role, Set<Permission>> = {
     "user:deactivate",
     "settings:view",
     "settings:update",
+    "catalog:manage",
     "audit:view",
   ]),
 };
