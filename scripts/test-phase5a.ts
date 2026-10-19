@@ -1,4 +1,6 @@
-import "dotenv/config";
+import { enforceTestDatabaseIsolation } from "./test-safety";
+enforceTestDatabaseIsolation();
+
 import { Role, Prisma } from "@prisma/client";
 import prisma from "../src/lib/prisma";
 import { can, assertPermission, Permission } from "../src/lib/permissions";

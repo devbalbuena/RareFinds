@@ -1,4 +1,6 @@
-import "dotenv/config";
+import { enforceTestDatabaseIsolation } from "./test-safety";
+enforceTestDatabaseIsolation();
+
 import { OrderStatus, PaymentStatus, PaymentMethod } from "@prisma/client";
 import prisma from "../src/lib/prisma";
 import { completeOrderPayment, cancelCustomerOrder } from "../src/lib/payments/order-payment";
