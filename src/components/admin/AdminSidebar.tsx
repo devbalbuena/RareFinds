@@ -10,6 +10,7 @@ import {
   Users,
   Settings,
   FileText,
+  Tags,
   ArrowLeft,
   LogOut,
   ShieldAlert,
@@ -51,6 +52,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin/products",
     icon: Package,
     permission: "product:view",
+  },
+  {
+    label: "Brands & Categories",
+    href: "/admin/catalog",
+    icon: Tags,
+    permission: "catalog:manage",
   },
   {
     label: "Customers",

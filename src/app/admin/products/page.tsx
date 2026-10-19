@@ -1,33 +1,62 @@
 import { verifyAdminSession } from "@/lib/admin-auth";
-import { Package, ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import prisma from "@/lib/prisma";
+import { getAdminProductsAction } from "@/actions/products";
+import { ProductManagementTable, SerializedAdminProduct } from "@/components/admin/ProductManagementTable";
 
-export default async function AdminProductsPlaceholderPage() {
-  await verifyAdminSession("product:view");
+export const metadata = {
+  title: "Sneaker Inventory & Catalog | RareFinds Vault Admin",
+  description: "Manage sneaker catalog, sizing variants, condition disclosures, and vault stock.",
+};
+
+interface AdminProductsPageProps {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}
+
+export default async function AdminProductsPage(props: AdminProductsPageProps) {
+  const caller = await verifyAdminSession("product:view");
+  const searchParams = await props.searchParams;
+  const initialSearch =
+    typeof searchParams.search === "string" ? searchParams.search : "";
+
+  const [productsResult, brands, categories] = await Promise.all([
+    getAdminProductsAction({
+      page: 1,
+      pageSize: 15,
+      sortBy: "newest",
+      search: initialSearch || undefined,
+    }),
+    prisma.brand.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+    prisma.category.findMany({
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  const initialProducts: SerializedAdminProduct[] = productsResult.products.map((p) => ({
+    ...p,
+    createdAt: typeof p.createdAt === "string" ? p.createdAt : p.createdAt.toISOString(),
+    variants: p.variants.map((v) => ({
+      ...v,
+      price: Number(v.price),
+      costPrice: v.costPrice !== null && v.costPrice !== undefined ? Number(v.costPrice) : null,
+    })),
+  }));
 
   return (
-    <div className="p-6 sm:p-10 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/admin" className="hover:text-white flex items-center gap-1">
-          <ArrowLeft className="h-3 w-3" /> Dashboard
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-300">Inventory &amp; Stock</span>
-      </div>
-
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-12 text-center space-y-4">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-500 border border-sky-500/20">
-          <Package className="h-7 w-7" />
-        </div>
-        <div className="space-y-1">
-          <h2 className="text-xl font-black uppercase tracking-tight text-white">
-            Sneaker Catalog &amp; Vault Stock
-          </h2>
-          <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-            Coming in the next phase: Variant stock controls, 1-of-1 grail allocation manager, image uploader with Supabase storage, and condition disclosures.
-          </p>
-        </div>
-      </div>
+    <div className="p-6 sm:p-10 max-w-7xl mx-auto">
+      <ProductManagementTable
+        initialSearch={initialSearch}
+        initialProducts={initialProducts}
+        initialTotal={productsResult.totalCount}
+        initialPage={productsResult.currentPage}
+        initialTotalPages={productsResult.totalPages}
+        brands={brands}
+        categories={categories}
+        userRole={caller.role}
+      />
     </div>
   );
 }

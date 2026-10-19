@@ -44,7 +44,7 @@ export default async function AdminDashboardPage() {
       },
     }),
     prisma.product.count({
-      where: { isActive: true },
+      where: { status: "ACTIVE" },
     }),
     prisma.order.count({
       where: {
