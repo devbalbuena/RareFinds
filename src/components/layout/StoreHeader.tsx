@@ -7,6 +7,7 @@ import { CartDrawer } from "@/components/cart/CartDrawer";
 import prisma from "@/lib/prisma";
 import { auth } from "@/auth";
 
+import { Shield } from "lucide-react";
 import { getStoreSettings } from "@/lib/settings";
 
 export async function StoreHeader() {
@@ -19,6 +20,9 @@ export async function StoreHeader() {
     auth(),
     getStoreSettings(),
   ]);
+
+  const isStaffOrAdmin =
+    session?.user?.role === "ADMIN" || session?.user?.role === "STAFF";
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 transition-all">
@@ -69,6 +73,17 @@ export async function StoreHeader() {
               <SearchInput />
             </React.Suspense>
           </div>
+
+          {/* Quick Dashboard link for Staff and Admins */}
+          {isStaffOrAdmin && (
+            <Link
+              href="/admin"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 text-xs font-bold transition-colors"
+            >
+              <Shield className="h-3.5 w-3.5" />
+              <span>Dashboard</span>
+            </Link>
+          )}
 
           {/* User Account Menu / Sign In */}
           <UserNav user={session?.user} />

@@ -15,7 +15,7 @@ export default async function SignInPage(props: SignInPageProps) {
   const callbackUrl =
     typeof searchParams.callbackUrl === "string"
       ? searchParams.callbackUrl
-      : "/account";
+      : undefined;
 
   return <SignInForm callbackUrl={callbackUrl} />;
 }

@@ -46,7 +46,10 @@ export const authConfig = {
       // Redirect authenticated users away from sign-in and sign-up
       if (isAuthPage) {
         if (isLoggedIn) {
-          return Response.redirect(new URL("/account", nextUrl));
+          if (userRole === Role.ADMIN || userRole === Role.STAFF) {
+            return Response.redirect(new URL("/admin", nextUrl));
+          }
+          return Response.redirect(new URL("/", nextUrl));
         }
         return true;
       }

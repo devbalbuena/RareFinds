@@ -76,17 +76,47 @@ export async function signUpAction(prevState: unknown, formData: FormData) {
 export async function signInAction(prevState: unknown, formData: FormData) {
   const email = formData.get("email");
   const password = formData.get("password");
-  const callbackUrl = (formData.get("callbackUrl") as string) || "/account";
+  const rawCallbackUrl = formData.get("callbackUrl");
 
   if (!email || !password || typeof email !== "string" || typeof password !== "string") {
     return { error: "Please enter both email and password." };
   }
 
+  const normalizedEmail = email.trim().toLowerCase();
+  const explicitCallback =
+    typeof rawCallbackUrl === "string" && rawCallbackUrl.trim().length > 0
+      ? rawCallbackUrl.trim()
+      : null;
+
+  // Determine role-based redirection:
+  // - STAFF & ADMIN go to /admin (respecting callbackUrl if already pointing into /admin)
+  // - CUSTOMER goes to the storefront / (respecting callbackUrl if provided, e.g. /checkout or /account)
+  let redirectTo = "/";
+  try {
+    const userRecord = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { role: true },
+    });
+
+    if (userRecord?.role === Role.ADMIN || userRecord?.role === Role.STAFF) {
+      if (explicitCallback && explicitCallback.startsWith("/admin")) {
+        redirectTo = explicitCallback;
+      } else {
+        redirectTo = "/admin";
+      }
+    } else {
+      redirectTo = explicitCallback || "/";
+    }
+  } catch (lookupErr) {
+    console.error("Error looking up user role for sign-in redirect:", lookupErr);
+    redirectTo = explicitCallback || "/";
+  }
+
   try {
     await signIn("credentials", {
-      email: email.trim().toLowerCase(),
+      email: normalizedEmail,
       password,
-      redirectTo: callbackUrl,
+      redirectTo,
     });
     return { success: true };
   } catch (error) {

@@ -14,7 +14,7 @@ interface SignInFormProps {
   callbackUrl?: string;
 }
 
-export function SignInForm({ callbackUrl = "/account" }: SignInFormProps) {
+export function SignInForm({ callbackUrl }: SignInFormProps) {
   const [state, formAction, isPending] = useActionState(signInAction, null);
   const searchParams = useSearchParams();
   const isDeactivatedRedirect = searchParams.get("error") === "deactivated";
@@ -31,7 +31,7 @@ export function SignInForm({ callbackUrl = "/account" }: SignInFormProps) {
       </CardHeader>
 
       <form action={formAction}>
-        <input type="hidden" name="callbackUrl" value={callbackUrl} />
+        <input type="hidden" name="callbackUrl" value={callbackUrl || ""} />
 
         <CardContent className="space-y-4 pt-2">
           {isDeactivatedRedirect && !state?.error && (
@@ -108,7 +108,7 @@ export function SignInForm({ callbackUrl = "/account" }: SignInFormProps) {
           <div className="text-xs text-center text-muted-foreground">
             Don&apos;t have an account yet?{" "}
             <Link
-              href={`/sign-up${callbackUrl !== "/account" ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
+              href={`/sign-up${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
               className="font-bold text-foreground hover:text-amber-500 underline underline-offset-4 transition-colors"
             >
               Create Account

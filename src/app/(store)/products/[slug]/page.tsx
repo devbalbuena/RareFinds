@@ -2,8 +2,10 @@ import * as React from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { ChevronRight, Calendar, Tag } from "lucide-react";
+import { ChevronRight, Calendar, Tag, Edit3 } from "lucide-react";
 import { getProductBySlug } from "@/lib/queries/products";
+import { auth } from "@/auth";
+import { can } from "@/lib/permissions";
 import { ProductImageGallery } from "@/components/catalog/ProductImageGallery";
 import { ProductVariantSelector } from "@/components/catalog/ProductVariantSelector";
 import { AuthenticityCard } from "@/components/catalog/AuthenticityCard";
@@ -19,7 +21,7 @@ export async function generateMetadata(
   const { slug } = await props.params;
   const product = await getProductBySlug(slug);
 
-  if (!product) {
+  if (!product || product.status !== "ACTIVE") {
     return {
       title: "Sneaker Not Found | RareFinds",
     };
@@ -43,11 +45,21 @@ export async function generateMetadata(
 export default async function ProductDetailPage(props: ProductDetailPageProps) {
   // Next.js 16 requirement: await params
   const { slug } = await props.params;
-  const product = await getProductBySlug(slug);
+  const [product, session] = await Promise.all([
+    getProductBySlug(slug),
+    auth(),
+  ]);
 
-  if (!product) {
+  if (!product || product.status !== "ACTIVE") {
     notFound();
   }
+
+  const userRole = session?.user?.role;
+  const canViewProductAdmin = can(userRole, "product:view");
+  const editUrl =
+    userRole === "ADMIN"
+      ? `/admin/products/${product.id}/edit`
+      : `/admin/products?search=${encodeURIComponent(product.sku || product.title)}`;
 
   const isSoldOut =
     product.variants.length > 0 &&
@@ -116,21 +128,36 @@ export default async function ProductDetailPage(props: ProductDetailPageProps) {
         <div className="lg:col-span-6 xl:col-span-5 flex flex-col gap-8">
           {/* Header Info */}
           <div className="space-y-3 border-b pb-6">
-            <div className="flex items-center gap-3 text-xs uppercase tracking-wider font-semibold text-muted-foreground">
-              <Link
-                href={`/products?brand=${product.brand.slug}`}
-                className="hover:text-primary transition-colors font-bold text-foreground"
-              >
-                {product.brand.name}
-              </Link>
-              {product.releaseYear && (
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  {product.releaseYear}
-                </span>
-              )}
-              {product.category && (
-                <span>• {product.category.name}</span>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-3 text-xs uppercase tracking-wider font-semibold text-muted-foreground">
+                <Link
+                  href={`/products?brand=${product.brand.slug}`}
+                  className="hover:text-primary transition-colors font-bold text-foreground"
+                >
+                  {product.brand.name}
+                </Link>
+                {product.releaseYear && (
+                  <span className="inline-flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
+                    {product.releaseYear}
+                  </span>
+                )}
+                {product.category && (
+                  <span>• {product.category.name}</span>
+                )}
+              </div>
+
+              {canViewProductAdmin && (
+                <Link
+                  href={editUrl}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-xs font-bold transition-colors"
+                  title={userRole === "ADMIN" ? "Edit product specifications & pricing" : "Adjust stock quantities in admin"}
+                >
+                  <Edit3 className="h-3 w-3" />
+                  <span>
+                    {userRole === "ADMIN" ? "Edit this product" : "Adjust stock"}
+                  </span>
+                </Link>
               )}
             </div>
 

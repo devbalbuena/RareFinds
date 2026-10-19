@@ -93,7 +93,7 @@ export function UserNav({ user }: UserNavProps) {
             <DropdownMenuItem asChild>
               <Link href="/admin" className="cursor-pointer gap-2 text-xs font-semibold text-amber-600 dark:text-amber-400">
                 <Shield className="h-3.5 w-3.5" />
-                Staff / Admin Portal
+                Dashboard
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
@@ -103,14 +103,14 @@ export function UserNav({ user }: UserNavProps) {
         <DropdownMenuItem asChild>
           <Link href="/account" className="cursor-pointer gap-2 text-xs">
             <Settings className="h-3.5 w-3.5 text-muted-foreground" />
-            Account & Addresses
+            My Account
           </Link>
         </DropdownMenuItem>
 
         <DropdownMenuItem asChild>
           <Link href="/account/orders" className="cursor-pointer gap-2 text-xs">
             <Package className="h-3.5 w-3.5 text-muted-foreground" />
-            Order History
+            My Orders
           </Link>
         </DropdownMenuItem>
 
