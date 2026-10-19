@@ -78,6 +78,7 @@ export async function getCartAction() {
   // Process items and check live availability
   const processedItems = cart.items.map((item) => {
     const v = item.variant;
+    const isInactive = v.product.status !== "ACTIVE";
     const isSold = v.isSold || v.stockQty <= 0;
     const isOnHold = Boolean(
       v.reservedUntil &&
@@ -88,7 +89,10 @@ export async function getCartAction() {
     let isUnavailable = false;
     let unavailableReason = "";
 
-    if (isSold) {
+    if (isInactive) {
+      isUnavailable = true;
+      unavailableReason = "Unavailable";
+    } else if (isSold) {
       isUnavailable = true;
       unavailableReason = "Sold Out";
     } else if (isOnHold) {
@@ -158,7 +162,7 @@ export async function addToCartAction(rawVariantId: string) {
       include: { product: true },
     });
 
-    if (!variant || !variant.product.isActive) {
+    if (!variant || variant.product.status !== "ACTIVE") {
       return { error: "NOT_FOUND", message: "Sneaker variant is no longer available." };
     }
 

@@ -178,6 +178,10 @@ export async function placeOrderAction(input: PlaceOrderInput) {
           throw new Error("A sneaker in your cart is no longer available.");
         }
 
+        if (v.product.status !== "ACTIVE") {
+          throw new Error(`"${v.product.title}" is no longer active in our catalog.`);
+        }
+
         if (v.isSold) {
           throw new Error(`"${v.product.title}" (${v.size}) has already been sold.`);
         }

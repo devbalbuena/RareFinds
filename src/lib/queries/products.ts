@@ -1,5 +1,5 @@
 import prisma from "@/lib/prisma";
-import { Condition, Prisma, Rarity } from "@prisma/client";
+import { Condition, Prisma, ProductStatus, Rarity } from "@prisma/client";
 
 export interface CatalogFilterParams {
   search?: string;
@@ -17,7 +17,7 @@ export interface CatalogFilterParams {
 export async function getFeaturedProducts(limit = 4) {
   return prisma.product.findMany({
     where: {
-      isActive: true,
+      status: ProductStatus.ACTIVE,
       isFeatured: true,
     },
     include: {
@@ -37,7 +37,7 @@ export async function getFeaturedProducts(limit = 4) {
 export async function getLatestProducts(limit = 8) {
   return prisma.product.findMany({
     where: {
-      isActive: true,
+      status: ProductStatus.ACTIVE,
     },
     include: {
       brand: true,
@@ -62,7 +62,7 @@ export async function getBrandsWithCounts() {
       _count: {
         select: {
           products: {
-            where: { isActive: true },
+            where: { status: ProductStatus.ACTIVE },
           },
         },
       },
@@ -125,7 +125,7 @@ export async function getFilteredProducts(rawParams: CatalogFilterParams) {
   const skip = (page - 1) * pageSize;
 
   const where: Prisma.ProductWhereInput = {
-    isActive: true,
+    status: ProductStatus.ACTIVE,
   };
 
   // Search filter (title, SKU, or colorway)
