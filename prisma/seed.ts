@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { PrismaClient, Role, Condition, Rarity } from "@prisma/client";
+import { PrismaClient, Role, Condition, Rarity, ProductStatus } from "@prisma/client";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
@@ -47,6 +47,63 @@ async function main() {
   });
 
   console.log(`✅ Seeded Admin User: ${admin.email} (ID: ${admin.id})`);
+
+  // 1a. Dev-Only Demo Accounts (STAFF and CUSTOMER)
+  const isDev = process.env.NODE_ENV !== "production";
+  if (isDev) {
+    // Demo Staff User
+    const staffEmail = process.env.DEMO_STAFF_EMAIL || "staff@rarefinds.ph";
+    const staffPassword = process.env.DEMO_STAFF_PASSWORD || rawPassword;
+    const staffPasswordHash = await bcrypt.hash(staffPassword, 10);
+
+    const staffUser = await prisma.user.upsert({
+      where: { email: staffEmail },
+      update: {
+        role: Role.STAFF,
+        passwordHash: staffPasswordHash,
+        isActive: true,
+      },
+      create: {
+        name: "Demo Staff",
+        email: staffEmail,
+        passwordHash: staffPasswordHash,
+        role: Role.STAFF,
+        isActive: true,
+      },
+    });
+    console.log(`✅ Seeded Dev Demo Staff: ${staffUser.email} (ID: ${staffUser.id})`);
+
+    // Demo Customer User
+    const customerEmail = process.env.DEMO_CUSTOMER_EMAIL || "customer@rarefinds.ph";
+    const customerPassword = process.env.DEMO_CUSTOMER_PASSWORD || rawPassword;
+    const customerPasswordHash = await bcrypt.hash(customerPassword, 10);
+
+    const customerUser = await prisma.user.upsert({
+      where: { email: customerEmail },
+      update: {
+        role: Role.CUSTOMER,
+        passwordHash: customerPasswordHash,
+        isActive: true,
+      },
+      create: {
+        name: "Demo Collector",
+        email: customerEmail,
+        passwordHash: customerPasswordHash,
+        role: Role.CUSTOMER,
+        isActive: true,
+      },
+    });
+
+    // Ensure customer cart exists
+    await prisma.cart.upsert({
+      where: { userId: customerUser.id },
+      update: {},
+      create: { userId: customerUser.id },
+    });
+    console.log(`✅ Seeded Dev Demo Customer: ${customerUser.email} (ID: ${customerUser.id})`);
+  } else {
+    console.log("ℹ️ Production environment detected: Dev demo accounts strictly skipped.");
+  }
 
   // 1b. Seed Default Store Settings
   const settings = await prisma.storeSettings.upsert({
@@ -389,6 +446,7 @@ async function main() {
         rarity: item.rarity,
         authenticityNotes: item.authenticityNotes,
         isFeatured: item.isFeatured,
+        status: ProductStatus.ACTIVE,
       },
       create: {
         title: item.title,
@@ -402,6 +460,7 @@ async function main() {
         rarity: item.rarity,
         authenticityNotes: item.authenticityNotes,
         isFeatured: item.isFeatured,
+        status: ProductStatus.ACTIVE,
       },
     });
 
