@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { checkAndExpireOrder } from "@/lib/orders/expiry";
 import { OrderSuccessActions } from "@/components/orders/OrderSuccessActions";
+import { OrderTrackingTimeline } from "@/components/orders/OrderTrackingTimeline";
 import { can } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -129,6 +130,19 @@ export default async function OrderSuccessPage(props: OrderSuccessPageProps) {
         initialPaymentStatus={order.paymentStatus}
         paymentMethod={order.paymentMethod}
         expiresAt={order.expiresAt ? order.expiresAt.toISOString() : null}
+      />
+
+      {/* Visual Courier Fulfillment Journey & Tracking */}
+      <OrderTrackingTimeline
+        status={order.status}
+        paymentStatus={order.paymentStatus}
+        shippingCarrier={order.shippingCarrier}
+        trackingNumber={order.trackingNumber}
+        createdAt={order.createdAt.toISOString()}
+        paidAt={order.paidAt ? order.paidAt.toISOString() : null}
+        shippedAt={order.shippedAt ? order.shippedAt.toISOString() : null}
+        deliveredAt={order.deliveredAt ? order.deliveredAt.toISOString() : null}
+        cancelledAt={order.cancelledAt ? order.cancelledAt.toISOString() : null}
       />
 
       {/* Order Details Grid */}

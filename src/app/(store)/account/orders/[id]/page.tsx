@@ -6,6 +6,8 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { checkAndExpireOrder } from "@/lib/orders/expiry";
 import { OrderSuccessActions } from "@/components/orders/OrderSuccessActions";
+import { OrderTrackingTimeline } from "@/components/orders/OrderTrackingTimeline";
+import { getStoreSettings } from "@/lib/settings";
 import { can } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -101,6 +103,7 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
     redirect("/account/orders");
   }
 
+  const storeSettings = await getStoreSettings();
   const address = order.shippingAddress as Record<string, string>;
   const statusInfo = statusBadgeConfig[order.status] || {
     label: order.status,
@@ -165,6 +168,19 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
         initialPaymentStatus={order.paymentStatus}
         paymentMethod={order.paymentMethod}
         expiresAt={order.expiresAt ? order.expiresAt.toISOString() : null}
+      />
+
+      {/* Live Visual Courier Tracking Timeline */}
+      <OrderTrackingTimeline
+        status={order.status}
+        paymentStatus={order.paymentStatus}
+        shippingCarrier={order.shippingCarrier}
+        trackingNumber={order.trackingNumber}
+        createdAt={order.createdAt.toISOString()}
+        paidAt={order.paidAt ? order.paidAt.toISOString() : null}
+        shippedAt={order.shippedAt ? order.shippedAt.toISOString() : null}
+        deliveredAt={order.deliveredAt ? order.deliveredAt.toISOString() : null}
+        cancelledAt={order.cancelledAt ? order.cancelledAt.toISOString() : null}
       />
 
       {/* Order Details Grid */}
@@ -240,7 +256,7 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
 
                   <div className="text-right">
                     <div className="font-mono font-bold text-foreground">
-                      {formatPrice(Number(item.subtotal))}
+                      {formatPrice(Number(item.subtotal), storeSettings.currencySymbol)}
                     </div>
                   </div>
                 </div>
@@ -251,12 +267,12 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
             <div className="border-t pt-3 space-y-1.5 text-xs">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span>{formatPrice(Number(order.subtotal))}</span>
+                <span>{formatPrice(Number(order.subtotal), storeSettings.currencySymbol)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>Shipping Fee</span>
                 <span className="text-emerald-500 font-semibold">
-                  {Number(order.shippingFee) === 0 ? "FREE" : formatPrice(Number(order.shippingFee))}
+                  {Number(order.shippingFee) === 0 ? "FREE" : formatPrice(Number(order.shippingFee), storeSettings.currencySymbol)}
                 </span>
               </div>
               <div className="flex justify-between text-muted-foreground">
@@ -275,7 +291,7 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
               )}
               <div className="border-t pt-2 flex justify-between font-bold text-sm text-foreground">
                 <span>Total Amount</span>
-                <span>{formatPrice(Number(order.totalAmount))}</span>
+                <span>{formatPrice(Number(order.totalAmount), storeSettings.currencySymbol)}</span>
               </div>
             </div>
           </CardContent>
