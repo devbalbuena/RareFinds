@@ -275,6 +275,8 @@ model Order {
   notes            String?       @db.Text
   expiresAt        DateTime?     // For 15-minute reservation window
   paidAt           DateTime?
+  shippedAt        DateTime?
+  deliveredAt      DateTime?
   cancelledAt      DateTime?
   items            OrderItem[]
   createdAt        DateTime      @default(now())
