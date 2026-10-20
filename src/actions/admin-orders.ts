@@ -1,7 +1,7 @@
 "use server";
 
 import { z } from "zod";
-import { OrderStatus, PaymentMethod, PaymentStatus, Role, StockAdjustmentReason } from "@prisma/client";
+import { OrderStatus, PaymentMethod, PaymentStatus, Prisma, Role, StockAdjustmentReason } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { revalidatePath } from "next/cache";
@@ -12,6 +12,17 @@ function safeRevalidatePath(path: string) {
   } catch {
     // Graceful no-op in standalone test or script contexts
   }
+}
+
+export interface ShippingAddressData {
+  fullName: string;
+  phone: string;
+  street: string;
+  apartment?: string | null;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
 }
 
 export interface SerializedAdminOrderItem {
@@ -40,16 +51,7 @@ export interface SerializedAdminOrder {
   customerName: string;
   customerEmail: string;
   customerPhone: string | null;
-  shippingAddress: {
-    fullName: string;
-    phone: string;
-    street: string;
-    apartment?: string | null;
-    city: string;
-    province: string;
-    postalCode: string;
-    country: string;
-  };
+  shippingAddress: ShippingAddressData;
   subtotal: number;
   shippingFee: number;
   totalAmount: number;
@@ -97,7 +99,7 @@ export async function getAdminOrdersAction(params: GetAdminOrdersParams = {}) {
   const pageSize = Math.min(50, Math.max(1, params.pageSize || 15));
   const skip = (page - 1) * pageSize;
 
-  const where: any = {};
+  const where: Prisma.OrderWhereInput = {};
 
   if (params.search && params.search.trim().length > 0) {
     const term = params.search.trim();
@@ -123,7 +125,7 @@ export async function getAdminOrdersAction(params: GetAdminOrdersParams = {}) {
     where.paymentStatus = params.paymentStatus;
   }
 
-  let orderBy: any = { createdAt: "desc" };
+  let orderBy: Prisma.OrderOrderByWithRelationInput = { createdAt: "desc" };
   if (params.sortBy === "oldest") {
     orderBy = { createdAt: "asc" };
   } else if (params.sortBy === "total_desc") {
@@ -194,7 +196,7 @@ export async function getAdminOrdersAction(params: GetAdminOrdersParams = {}) {
     customerName: o.customerName,
     customerEmail: o.customerEmail,
     customerPhone: o.customerPhone,
-    shippingAddress: o.shippingAddress as any,
+    shippingAddress: o.shippingAddress as unknown as ShippingAddressData,
     subtotal: Number(o.subtotal),
     shippingFee: Number(o.shippingFee),
     totalAmount: Number(o.totalAmount),
@@ -293,7 +295,7 @@ export async function getAdminOrderByIdAction(orderId: string) {
     customerName: order.customerName,
     customerEmail: order.customerEmail,
     customerPhone: order.customerPhone,
-    shippingAddress: order.shippingAddress as any,
+    shippingAddress: order.shippingAddress as unknown as ShippingAddressData,
     subtotal: Number(order.subtotal),
     shippingFee: Number(order.shippingFee),
     totalAmount: Number(order.totalAmount),
@@ -390,7 +392,7 @@ export async function updateOrderStatusAction(input: z.infer<typeof updateStatus
       return { error: "Cannot update status of a cancelled order." };
     }
 
-    const updateData: any = { status };
+    const updateData: Prisma.OrderUpdateInput = { status };
 
     // Timestamp transitions
     if (status === "SHIPPED") {
@@ -476,7 +478,7 @@ export async function updateOrderTrackingAction(input: z.infer<typeof updateTrac
       return { error: "Order not found." };
     }
 
-    const updateData: any = {
+    const updateData: Prisma.OrderUpdateInput = {
       shippingCarrier: shippingCarrier.trim(),
       trackingNumber: trackingNumber.trim(),
     };
