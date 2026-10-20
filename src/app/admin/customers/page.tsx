@@ -1,33 +1,87 @@
-import { verifyAdminSession } from "@/lib/admin-auth";
-import { Users, ArrowLeft } from "lucide-react";
+import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowLeft, Users } from "lucide-react";
+import { verifyAdminSession } from "@/lib/admin-auth";
+import { getStoreSettings } from "@/lib/settings";
+import { getAdminCustomersAction } from "@/actions/admin-customers";
+import { CustomerManagementTable } from "@/components/admin/CustomerManagementTable";
 
-export default async function AdminCustomersPlaceholderPage() {
-  await verifyAdminSession("customer:view");
+export const metadata: Metadata = {
+  title: "Customer Directory | RareFinds Admin",
+};
+
+interface AdminCustomersPageProps {
+  searchParams: Promise<{
+    page?: string;
+    search?: string;
+    role?: string;
+    sortBy?: "spend_desc" | "orders_desc" | "newest" | "oldest";
+  }>;
+}
+
+export default async function AdminCustomersPage(props: AdminCustomersPageProps) {
+  try {
+    await verifyAdminSession("customer:view");
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "";
+    if (msg.includes("deactivated")) {
+      redirect("/sign-in?error=deactivated");
+    }
+    redirect("/sign-in?callbackUrl=/admin/customers");
+  }
+
+  const searchParams = await props.searchParams;
+  const page = parseInt(searchParams.page || "1", 10);
+
+  const { customers, totalCount, totalPages, currentPage, metrics } =
+    await getAdminCustomersAction({
+      page: isNaN(page) ? 1 : page,
+      pageSize: 15,
+      search: searchParams.search,
+      role: searchParams.role,
+      sortBy: searchParams.sortBy,
+    });
+
+  const storeSettings = await getStoreSettings();
 
   return (
-    <div className="p-6 sm:p-10 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/admin" className="hover:text-white flex items-center gap-1">
-          <ArrowLeft className="h-3 w-3" /> Dashboard
-        </Link>
-        <span>/</span>
-        <span className="text-zinc-300">Customers</span>
+    <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-6">
+      {/* Breadcrumb & Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-800">
+        <div>
+          <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
+            <Link href="/admin" className="hover:text-white flex items-center gap-1">
+              <ArrowLeft className="h-3 w-3" /> Dashboard
+            </Link>
+            <span>/</span>
+            <span className="text-zinc-300">Customers</span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              <Users className="w-5 h-5" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold font-mono tracking-tight text-white">
+                Customer & Collector Directory
+              </h1>
+              <p className="text-xs text-zinc-400">
+                Track buyer lifetime values, spending tiers, order frequencies, and shipping profiles.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-12 text-center space-y-4">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
-          <Users className="h-7 w-7" />
-        </div>
-        <div className="space-y-1">
-          <h2 className="text-xl font-black uppercase tracking-tight text-white">
-            Customer Directory
-          </h2>
-          <p className="text-xs text-zinc-400 max-w-md mx-auto leading-relaxed">
-            Coming in the next phase: Registered buyer directory, vault purchase histories, shipping address profiles, and collector tier badges.
-          </p>
-        </div>
-      </div>
+      {/* Main Interactive Table & Metrics */}
+      <CustomerManagementTable
+        initialCustomers={customers}
+        totalCount={totalCount}
+        totalPages={totalPages}
+        currentPage={currentPage}
+        metrics={metrics}
+        currencySymbol={storeSettings.currencySymbol}
+      />
     </div>
   );
 }
