@@ -22,12 +22,17 @@ import {
   Sparkles,
   History,
   ShieldCheck,
+  KeyRound,
+  Store,
+  ShieldAlert,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import {
   updateOrderStatusAction,
   updateOrderTrackingAction,
   cancelOrderAdminAction,
+  confirmOrderQcAction,
+  markOrderDeliveredAction,
   SerializedAdminOrder,
 } from "@/actions/admin-orders";
 import { OrderStatus } from "@prisma/client";
@@ -149,60 +154,103 @@ export function OrderDetailView({
   const [cancelReason, setCancelReason] = React.useState("Customer requested cancellation");
   const [isCancelling, setIsCancelling] = React.useState(false);
 
+  // Delivery PIN Verification Modal State (for LOCAL_DELIVERY)
+  const [isDeliveredModalOpen, setIsDeliveredModalOpen] = React.useState(false);
+  const [enteredPin, setEnteredPin] = React.useState("");
+  const [adminOverrideReason, setAdminOverrideReason] = React.useState("");
+  const [isSubmittingDelivery, setIsSubmittingDelivery] = React.useState(false);
+
   const statusInfo = ORDER_STATUS_CONFIG[order.status] || {
     label: order.status,
     badgeClass: "bg-zinc-100 text-zinc-600 border-zinc-200",
     desc: "",
   };
 
-  // Derive fulfillment journey timeline
+  // Derive fulfillment journey timeline (5 Honest Steps)
   const isDelivered = order.status === "DELIVERED";
   const isShipped = order.status === "SHIPPED" || isDelivered;
-  const isProcessing =
-    order.status === "PROCESSING" ||
-    order.status === "PAID" ||
-    isShipped;
+  const isQcCompleted = Boolean(order.qcVerifiedAt) || order.status === "PROCESSING" || isShipped;
   const isCancelled = order.status === "CANCELLED";
+  const isExpired = order.status === "EXPIRED";
+  const isCod = order.paymentMethod === "COD";
 
   const timeline = [
     {
       step: 1,
       title: "Order Placed",
-      description: "Order received in system.",
+      description: "Order secured in vault system.",
       date: order.createdAt,
       completed: true,
       current: order.status === "PENDING" || order.status === "PENDING_PAYMENT",
     },
     {
       step: 2,
-      title: "Processing & QC",
-      description: order.paymentStatus === "PAID" ? "Payment secured & QC verified" : "Awaiting vault authentication",
-      date: order.paidAt || (isProcessing ? order.updatedAt : null),
-      completed: isProcessing,
-      current: order.status === "PROCESSING" || order.status === "PAID",
+      title: isCod ? "Payment (COD)" : "Payment Confirmed",
+      description: isCod
+        ? isDelivered
+          ? "Cash collected at delivery"
+          : "Cash settles upon delivery inspection"
+        : order.paymentStatus === "PAID"
+        ? "Payment verified & holds cleared"
+        : "Awaiting payment verification",
+      date: order.paidAt,
+      completed: isCod ? isDelivered : order.paymentStatus === "PAID",
+      current: !isCod && order.status === "PENDING_PAYMENT",
     },
     {
       step: 3,
-      title: "Dispatched",
-      description: order.shippingCarrier
-        ? `${order.shippingCarrier} (${order.trackingNumber || "Assigned"})`
-        : "Pending courier pickup",
+      title: "Authentication & QC",
+      description: isQcCompleted
+        ? `Inspected & sealed${order.qcVerifiedBy?.name ? ` by ${order.qcVerifiedBy.name}` : ""}`
+        : "Pending staff authenticity inspection",
+      date: order.qcVerifiedAt,
+      completed: isQcCompleted,
+      current:
+        !isQcCompleted &&
+        ((isCod && order.status === "PENDING") || (!isCod && (order.status === "PAID" || order.status === "PROCESSING"))),
+    },
+    {
+      step: 4,
+      title:
+        order.deliveryMethod === "PICKUP"
+          ? "Ready for Pickup"
+          : order.deliveryMethod === "LOCAL_DELIVERY"
+          ? "Local Rider Handover"
+          : "Courier In Transit",
+      description:
+        order.deliveryMethod === "PICKUP"
+          ? isShipped
+            ? "Ready for claiming at the store vault"
+            : "Preparing for store handover"
+          : order.shippingCarrier
+          ? `${order.shippingCarrier} (${order.trackingNumber || "Assigned"})`
+          : "Pending courier dispatch",
       date: order.shippedAt,
       completed: isShipped,
       current: order.status === "SHIPPED",
     },
     {
-      step: 4,
-      title: isCancelled ? "Order Cancelled" : "Delivered",
+      step: 5,
+      title: isCancelled
+        ? "Order Cancelled"
+        : isExpired
+        ? "Hold Expired"
+        : order.deliveryMethod === "PICKUP"
+        ? "Claimed at Vault"
+        : "Delivered",
       description: isCancelled
         ? "Items returned to inventory"
+        : isExpired
+        ? "Hold timer expired"
         : isDelivered
-        ? "Package handed over to recipient (Signed POD)"
-        : "Final destination delivery",
+        ? order.customerConfirmedAt
+          ? "Delivered & customer confirmed"
+          : "Package handed over to recipient"
+        : "Final destination handover",
       date: isCancelled ? order.cancelledAt : order.deliveredAt,
-      completed: isDelivered || isCancelled,
-      current: isDelivered || isCancelled,
-      isCancelled,
+      completed: isDelivered || isCancelled || isExpired,
+      current: isDelivered || isCancelled || isExpired,
+      isCancelled: isCancelled || isExpired,
     },
   ];
 
@@ -251,29 +299,46 @@ export function OrderDetailView({
     }
   }
 
-  // Quick Action: Confirm QC & Move to Processing
-  async function handleQuickProcessing() {
+  // Quick Action: Confirm Authenticity & QC
+  async function handleConfirmQc() {
     setIsUpdatingStatus(true);
     setFeedback(null);
-    const res = await updateOrderStatusAction({
+    const res = await confirmOrderQcAction({
       orderId: order.id,
-      status: "PROCESSING",
-      notes: "Staff verified order details and vault specimen allocated for QC inspection.",
+      notes: "Staff verified authenticity and condition in vault. Passed QC.",
     });
     setIsUpdatingStatus(false);
     if (res.error) {
       setFeedback({ type: "error", message: res.error });
     } else {
-      setFeedback({ type: "success", message: "Order advanced to Processing & QC." });
+      setFeedback({ type: "success", message: "Vault Authentication & QC confirmed!" });
       router.refresh();
     }
   }
 
-  // Quick Action: Mark Delivered
-  async function handleQuickMarkDelivered() {
+  // Quick Action: Ready for Pickup (For PICKUP orders in PROCESSING)
+  async function handleMarkReadyForPickup() {
+    setIsUpdatingStatus(true);
+    setFeedback(null);
+    const res = await updateOrderStatusAction({
+      orderId: order.id,
+      status: "SHIPPED",
+      notes: "Specimen prepared and placed in vault pickup lockers.",
+    });
+    setIsUpdatingStatus(false);
+    if (res.error) {
+      setFeedback({ type: "error", message: res.error });
+    } else {
+      setFeedback({ type: "success", message: "Order is now ready for customer pickup!" });
+      router.refresh();
+    }
+  }
+
+  // Quick Action: Complete Delivery (direct for COURIER / PICKUP)
+  async function handleDirectDelivery(notes: string) {
     if (
       !confirm(
-        "Confirm that this order has been successfully delivered to the customer?\n\n(If COD, payment will automatically be marked as settled)"
+        "Confirm that this order has been successfully delivered/claimed?\n\n(If COD, payment will automatically settle as PAID)"
       )
     ) {
       return;
@@ -281,12 +346,10 @@ export function OrderDetailView({
 
     setIsUpdatingStatus(true);
     setFeedback(null);
-    const res = await updateOrderStatusAction({
+    const res = await markOrderDeliveredAction({
       orderId: order.id,
-      status: "DELIVERED",
-      notes: "Courier delivered package to customer. Proof of delivery (POD) verified.",
+      notes,
     });
-
     setIsUpdatingStatus(false);
     if (res.error) {
       setFeedback({ type: "error", message: res.error });
@@ -294,6 +357,36 @@ export function OrderDetailView({
       setFeedback({
         type: "success",
         message: "Order marked as DELIVERED! Delivery timestamp recorded and COD reconciled.",
+      });
+      router.refresh();
+    }
+  }
+
+  // Handle Delivery with PIN Verification (for LOCAL_DELIVERY)
+  async function handlePinDeliverySubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setIsSubmittingDelivery(true);
+    setFeedback(null);
+
+    const res = await markOrderDeliveredAction({
+      orderId: order.id,
+      pin: enteredPin ? enteredPin.trim() : undefined,
+      adminOverrideReason: adminOverrideReason ? adminOverrideReason.trim() : undefined,
+      notes: adminOverrideReason
+        ? `Delivered via admin override: ${adminOverrideReason.trim()}`
+        : "Delivered via verified customer PIN.",
+    });
+
+    setIsSubmittingDelivery(false);
+    if (res.error) {
+      setFeedback({ type: "error", message: res.error });
+    } else {
+      setIsDeliveredModalOpen(false);
+      setEnteredPin("");
+      setAdminOverrideReason("");
+      setFeedback({
+        type: "success",
+        message: "PIN verified and order successfully marked as DELIVERED!",
       });
       router.refresh();
     }
@@ -564,10 +657,11 @@ export function OrderDetailView({
 
             {order.status !== "CANCELLED" && (
               <>
-                {/* 1. Advance Pending -> Processing */}
-                {order.status === "PENDING" && (
+                {/* 1. Advance to QC (PROCESSING) */}
+                {((order.paymentMethod === "COD" && order.status === "PENDING") ||
+                  (order.paymentMethod !== "COD" && order.status === "PAID")) && (
                   <button
-                    onClick={handleQuickProcessing}
+                    onClick={handleConfirmQc}
                     disabled={isUpdatingStatus}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-xs transition"
                   >
@@ -576,24 +670,79 @@ export function OrderDetailView({
                   </button>
                 )}
 
-                {/* 2. Assign Courier & Ship */}
-                <button
-                  onClick={() => setIsTrackingModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition"
-                >
-                  <Truck className="w-3.5 h-3.5" />
-                  {order.shippingCarrier ? "Update Courier" : "Assign Courier & Ship"}
-                </button>
+                {/* 2. Ready for Pickup (if PICKUP) or Courier Dispatch */}
+                {order.status === "PROCESSING" && (
+                  <>
+                    {order.deliveryMethod === "PICKUP" ? (
+                      <button
+                        onClick={handleMarkReadyForPickup}
+                        disabled={isUpdatingStatus}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-purple-600 text-white hover:bg-purple-700 shadow-xs transition"
+                      >
+                        <Store className="w-3.5 h-3.5" />
+                        Mark Ready for Pickup
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setIsTrackingModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs transition"
+                      >
+                        <Truck className="w-3.5 h-3.5" />
+                        {order.deliveryMethod === "LOCAL_DELIVERY"
+                          ? "Dispatch Local Rider"
+                          : "Assign Courier & Ship"}
+                      </button>
+                    )}
+                  </>
+                )}
 
-                {/* 3. Mark as Delivered (Prominent when SHIPPED) */}
+                {/* 3. Mark as Delivered / Claimed (when SHIPPED) */}
                 {order.status === "SHIPPED" && (
+                  <>
+                    {order.deliveryMethod === "LOCAL_DELIVERY" ? (
+                      <button
+                        onClick={() => setIsDeliveredModalOpen(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition"
+                      >
+                        <KeyRound className="w-3.5 h-3.5" />
+                        Verify PIN & Deliver
+                      </button>
+                    ) : order.deliveryMethod === "PICKUP" ? (
+                      <button
+                        onClick={() =>
+                          handleDirectDelivery(
+                            "Customer presented pickup claim and collected artifact at store vault."
+                          )
+                        }
+                        disabled={isUpdatingStatus}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Confirm Customer Claimed
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          handleDirectDelivery("Courier delivered package to customer.")
+                        }
+                        disabled={isUpdatingStatus}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        Mark as Delivered
+                      </button>
+                    )}
+                  </>
+                )}
+
+                {/* Tracking modal button for updating carrier/waybill info */}
+                {order.deliveryMethod !== "PICKUP" && (
                   <button
-                    onClick={handleQuickMarkDelivered}
-                    disabled={isUpdatingStatus}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition"
+                    onClick={() => setIsTrackingModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    Mark as Delivered
+                    <Truck className="w-3.5 h-3.5" />
+                    {order.shippingCarrier ? "Update Courier" : "Assign Courier"}
                   </button>
                 )}
 
@@ -646,19 +795,54 @@ export function OrderDetailView({
           </div>
         )}
 
+        {/* Customer Problem Report Alert */}
+        {order.problemReportedAt && (
+          <div className="p-4 rounded-xl border border-rose-300 bg-rose-50 text-rose-900 flex items-start justify-between gap-3 shadow-2xs">
+            <div className="flex items-start gap-2.5">
+              <ShieldAlert className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-bold text-sm text-rose-950">
+                  Customer Reported a Problem with This Order
+                </h3>
+                <p className="text-xs text-rose-800 mt-0.5">
+                  Reported on {new Date(order.problemReportedAt).toLocaleString()} during the inspection window.
+                </p>
+                {order.problemReason && (
+                  <div className="mt-2 text-xs font-mono bg-white/80 p-2.5 rounded-lg border border-rose-200 text-rose-900">
+                    &ldquo;{order.problemReason}&rdquo;
+                  </div>
+                )}
+              </div>
+            </div>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-rose-200 text-rose-800 shrink-0">
+              ACTION REQUIRED
+            </span>
+          </div>
+        )}
+
+        {/* Customer Confirmation Badge */}
+        {order.customerConfirmedAt && (
+          <div className="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-900 flex items-center gap-2 text-xs font-medium shadow-2xs">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>
+              Customer confirmed receipt on {new Date(order.customerConfirmedAt).toLocaleString()}.
+            </span>
+          </div>
+        )}
+
         {/* ── FULFILLMENT TIMELINE ────────────────────────────────────────── */}
         <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-xs">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
               <Clock className="w-4 h-4 text-amber-500" />
-              <span>4-Step Fulfillment Lifecycle</span>
+              <span>5-Step Fulfillment Lifecycle</span>
             </h2>
             <span className="text-xs text-zinc-500">
               Real-time synchronization across Customer, Staff, and Admin roles
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 relative">
             {timeline.map((step) => (
               <div
                 key={step.step}
@@ -959,11 +1143,28 @@ export function OrderDetailView({
               </div>
             </div>
 
-            {/* Shipping Address Card */}
+            {/* Shipping / Delivery Details Card */}
             <div className="bg-white border border-zinc-200 rounded-2xl p-5 space-y-4 shadow-xs">
-              <div className="flex items-center gap-2 pb-3 border-b border-zinc-200">
-                <MapPin className="w-4 h-4 text-emerald-600" />
-                <h2 className="text-sm font-bold text-zinc-900">Delivery Address</h2>
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-200">
+                <div className="flex items-center gap-2">
+                  {order.deliveryMethod === "PICKUP" ? (
+                    <Store className="w-4 h-4 text-purple-600" />
+                  ) : order.deliveryMethod === "LOCAL_DELIVERY" ? (
+                    <Truck className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <MapPin className="w-4 h-4 text-emerald-600" />
+                  )}
+                  <h2 className="text-sm font-bold text-zinc-900">
+                    {order.deliveryMethod === "PICKUP" ? "Pickup Location" : "Delivery Address"}
+                  </h2>
+                </div>
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded bg-zinc-100 text-zinc-800 border border-zinc-200 uppercase">
+                  {order.deliveryMethod === "LOCAL_DELIVERY"
+                    ? "Local Delivery"
+                    : order.deliveryMethod === "PICKUP"
+                    ? "Vault Pickup"
+                    : "Courier"}
+                </span>
               </div>
 
               <div className="text-xs text-zinc-700 space-y-1">
@@ -981,6 +1182,26 @@ export function OrderDetailView({
                 </div>
                 <div className="text-zinc-500">{order.shippingAddress.country}</div>
               </div>
+
+              {/* Local Delivery PIN display */}
+              {order.deliveryMethod === "LOCAL_DELIVERY" && (
+                <div className="pt-3 border-t border-zinc-100">
+                  <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 flex items-center justify-between">
+                    <div>
+                      <div className="text-[11px] font-bold text-emerald-950 flex items-center gap-1">
+                        <KeyRound className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Security Delivery PIN</span>
+                      </div>
+                      <div className="text-[10px] text-emerald-800 mt-0.5">
+                        Attempts used: {order.deliveryPinAttempts} / 5
+                      </div>
+                    </div>
+                    <span className="font-mono text-base font-black text-emerald-950 tracking-widest bg-white px-2.5 py-1 rounded border border-emerald-300">
+                      {order.deliveryPin || "----"}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Payment Details Card */}
@@ -1219,6 +1440,77 @@ export function OrderDetailView({
                 >
                   {isCancelling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Confirm Cancellation
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL: VERIFY DELIVERY PIN (FOR LOCAL DELIVERY) ─────────────── */}
+      {isDeliveredModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white border border-zinc-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl text-zinc-900">
+            <div className="flex items-center gap-2 text-emerald-700">
+              <KeyRound className="w-5 h-5 text-emerald-600" />
+              <h3 className="text-lg font-bold">Local Delivery Handover Verification</h3>
+            </div>
+            <p className="text-xs text-zinc-600 leading-relaxed">
+              To complete this local delivery, input the 4-digit security PIN provided to the customer upon order placement.
+            </p>
+
+            <form onSubmit={handlePinDeliverySubmit} className="space-y-4 pt-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-zinc-700 flex justify-between">
+                  <span>Customer 4-Digit Delivery PIN</span>
+                  <span className="font-mono text-zinc-400 text-[11px]">
+                    Attempts used: {order.deliveryPinAttempts}/5
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={enteredPin}
+                  onChange={(e) => setEnteredPin(e.target.value)}
+                  placeholder="e.g. 7492"
+                  className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-lg text-center tracking-widest font-mono font-bold text-zinc-900 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              {/* Admin Override Option */}
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 space-y-2">
+                <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                  <ShieldAlert className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Admin Emergency Override</span>
+                </div>
+                <p className="text-[11px] text-amber-800 leading-relaxed">
+                  If the customer is unable to access their device or maximum attempts were reached, an Administrator can override with a documented reason.
+                </p>
+                <input
+                  type="text"
+                  value={adminOverrideReason}
+                  onChange={(e) => setAdminOverrideReason(e.target.value)}
+                  placeholder="Document reason for audit log (min 5 chars)..."
+                  className="w-full bg-white border border-amber-300 rounded-lg px-2.5 py-1.5 text-xs text-zinc-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDeliveredModalOpen(false)}
+                  disabled={isSubmittingDelivery}
+                  className="px-4 py-2 text-xs rounded-xl bg-zinc-100 text-zinc-700 hover:bg-zinc-200 font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDelivery || (!enteredPin && !adminOverrideReason)}
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 flex items-center gap-1.5 shadow-xs disabled:opacity-50"
+                >
+                  {isSubmittingDelivery && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  Verify & Complete Delivery
                 </button>
               </div>
             </form>

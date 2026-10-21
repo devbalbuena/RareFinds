@@ -260,6 +260,7 @@ async function runTests() {
         subtotal: 25000,
         shippingFee: 0,
         totalAmount: 25000,
+        deliveryMethod: "COURIER",
         paymentMethod: "TEST",
         items: {
           create: {

@@ -1,7 +1,7 @@
 import { enforceTestDatabaseIsolation } from "./test-safety";
 enforceTestDatabaseIsolation();
 
-import { OrderStatus, PaymentStatus, PaymentMethod } from "@prisma/client";
+import { OrderStatus, PaymentStatus, PaymentMethod, DeliveryMethod } from "@prisma/client";
 import prisma from "../src/lib/prisma";
 import { completeOrderPayment, cancelCustomerOrder } from "../src/lib/payments/order-payment";
 import { checkAndExpireOrder } from "../src/lib/orders/expiry";
@@ -94,6 +94,7 @@ async function runPhase4aTests() {
         shippingAddress: { street: "123 Ayala Ave", city: "Makati", province: "Metro Manila", postalCode: "1200", phone: "09171234567" },
         subtotal: grail1.price,
         totalAmount: grail1.price,
+        deliveryMethod: DeliveryMethod.COURIER,
         status: OrderStatus.PENDING_PAYMENT,
         paymentStatus: PaymentStatus.UNPAID,
         paymentMethod: PaymentMethod.TEST,
@@ -174,6 +175,7 @@ async function runPhase4aTests() {
         shippingAddress: { street: "456 BGC High St", city: "Taguig", province: "Metro Manila", postalCode: "1634", phone: "09189876543" },
         subtotal: grail2.price,
         totalAmount: grail2.price,
+        deliveryMethod: DeliveryMethod.COURIER,
         status: OrderStatus.PENDING, // PENDING confirmation for COD
         paymentStatus: PaymentStatus.UNPAID,
         paymentMethod: PaymentMethod.COD,
@@ -255,6 +257,7 @@ async function runPhase4aTests() {
       shippingAddress: { street: "Stale Road", city: "Pasig", province: "Metro Manila", postalCode: "1600", phone: "09170000000" },
       subtotal: grail4.price,
       totalAmount: grail4.price,
+      deliveryMethod: DeliveryMethod.COURIER,
       status: OrderStatus.PENDING_PAYMENT,
       paymentStatus: PaymentStatus.UNPAID,
       paymentMethod: PaymentMethod.TEST,
@@ -303,6 +306,7 @@ async function runPhase4aTests() {
       shippingAddress: { street: "Cancel St", city: "Manila", province: "Metro Manila", postalCode: "1000", phone: "09170000000" },
       subtotal: grail5.price,
       totalAmount: grail5.price,
+      deliveryMethod: DeliveryMethod.COURIER,
       status: OrderStatus.PENDING_PAYMENT,
       paymentStatus: PaymentStatus.UNPAID,
       paymentMethod: PaymentMethod.TEST,

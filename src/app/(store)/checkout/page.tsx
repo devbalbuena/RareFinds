@@ -150,7 +150,15 @@ export default async function CheckoutPage() {
         savedAddresses={serializedAddresses}
         cartItems={serializedCartItems}
         subtotal={subtotal}
-        shippingFee={settings.shippingFee}
+        shippingFeeLocal={settings.shippingFeeLocal}
+        shippingFeeCourier={settings.shippingFeeCourier}
+        pickupAddress={settings.pickupAddress}
+        pickupInstructions={settings.pickupInstructions}
+        localDeliveryAreas={settings.localDeliveryAreas}
+        codEnabled={settings.codEnabled}
+        codAllowedAreas={settings.codAllowedAreas}
+        codMaxAmount={settings.codMaxAmount}
+        manualPaymentInstructions={settings.manualPaymentInstructions}
         currencySymbol={settings.currencySymbol}
         storeName={settings.storeName}
         userEmail={user?.email || session.user.email || ""}

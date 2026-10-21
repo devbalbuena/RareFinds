@@ -177,14 +177,23 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
 
       {/* Live Visual Courier Tracking Timeline */}
       <OrderTrackingTimeline
+        orderId={order.id}
         status={order.status}
         paymentStatus={order.paymentStatus}
+        paymentMethod={order.paymentMethod}
+        deliveryMethod={order.deliveryMethod}
+        deliveryPin={order.deliveryPin}
         shippingCarrier={order.shippingCarrier}
         trackingNumber={order.trackingNumber}
         createdAt={order.createdAt.toISOString()}
         paidAt={order.paidAt ? order.paidAt.toISOString() : null}
+        qcVerifiedAt={order.qcVerifiedAt ? order.qcVerifiedAt.toISOString() : null}
         shippedAt={order.shippedAt ? order.shippedAt.toISOString() : null}
         deliveredAt={order.deliveredAt ? order.deliveredAt.toISOString() : null}
+        customerConfirmedAt={order.customerConfirmedAt ? order.customerConfirmedAt.toISOString() : null}
+        problemReportedAt={order.problemReportedAt ? order.problemReportedAt.toISOString() : null}
+        problemReason={order.problemReason}
+        autoCompleteAt={order.autoCompleteAt ? order.autoCompleteAt.toISOString() : null}
         cancelledAt={order.cancelledAt ? order.cancelledAt.toISOString() : null}
       />
 

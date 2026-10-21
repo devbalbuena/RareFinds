@@ -27,6 +27,18 @@ async function fetchStoreSettings(): Promise<SiteConfig> {
       currency: settings.currency || defaultSiteConfig.currency,
       currencySymbol: settings.currencySymbol || defaultSiteConfig.currencySymbol,
       shippingFee: Number(settings.shippingFee ?? 0),
+      shippingFeeLocal: Number(settings.shippingFeeLocal ?? 150),
+      shippingFeeCourier: Number(settings.shippingFeeCourier ?? 250),
+      pickupAddress: settings.pickupAddress || null,
+      pickupInstructions: settings.pickupInstructions || null,
+      localDeliveryAreas: settings.localDeliveryAreas || null,
+      codEnabled: Boolean(settings.codEnabled ?? false),
+      codAllowedAreas: settings.codAllowedAreas || null,
+      codMaxAmount: Number(settings.codMaxAmount ?? 20000),
+      manualPaymentInstructions: settings.manualPaymentInstructions || null,
+      manualPaymentQrKey: settings.manualPaymentQrKey || null,
+      manualPaymentHoldMinutes: settings.manualPaymentHoldMinutes ?? 60,
+      autoCompleteDays: settings.autoCompleteDays ?? 3,
     };
   } catch (err) {
     console.error("[getStoreSettings] Database error fetching settings, using fallback:", err);

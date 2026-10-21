@@ -16,6 +16,7 @@ import {
   MapPin,
   Sparkles,
   Smartphone,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,7 +63,15 @@ interface CheckoutFormProps {
   savedAddresses: SerializedAddress[];
   cartItems: SerializedCartItem[];
   subtotal: number;
-  shippingFee?: number;
+  shippingFeeLocal?: number;
+  shippingFeeCourier?: number;
+  pickupAddress?: string | null;
+  pickupInstructions?: string | null;
+  localDeliveryAreas?: string | null;
+  codEnabled?: boolean;
+  codAllowedAreas?: string | null;
+  codMaxAmount?: number;
+  manualPaymentInstructions?: string | null;
   currencySymbol?: string;
   storeName?: string;
   userEmail: string;
@@ -74,7 +83,15 @@ export function CheckoutForm({
   savedAddresses,
   cartItems,
   subtotal,
-  shippingFee = 0,
+  shippingFeeLocal = 150,
+  shippingFeeCourier = 250,
+  pickupAddress = null,
+  pickupInstructions = null,
+  localDeliveryAreas = null,
+  codEnabled = false,
+  codAllowedAreas = null,
+  codMaxAmount = 20000,
+  manualPaymentInstructions = null,
   currencySymbol = "₱",
   storeName = "RareFinds",
   userEmail,
@@ -83,6 +100,17 @@ export function CheckoutForm({
 }: CheckoutFormProps) {
   const router = useRouter();
   const errorRef = React.useRef<HTMLDivElement>(null);
+
+  // Delivery Method state
+  type AllowedDeliveryMethod = "PICKUP" | "LOCAL_DELIVERY" | "COURIER";
+  const [deliveryMethod, setDeliveryMethod] = React.useState<AllowedDeliveryMethod>("COURIER");
+
+  // Dynamic Shipping Fee Calculation
+  const shippingFee = React.useMemo(() => {
+    if (deliveryMethod === "PICKUP") return 0;
+    if (deliveryMethod === "LOCAL_DELIVERY") return shippingFeeLocal;
+    return shippingFeeCourier;
+  }, [deliveryMethod, shippingFeeLocal, shippingFeeCourier]);
 
   const totalAmount = subtotal + shippingFee;
 
@@ -142,11 +170,24 @@ export function CheckoutForm({
   };
 
   // Payment method state
-  type AllowedPaymentMethod = "COD" | "GCASH" | "MAYA" | "CARD" | "TEST";
+  type AllowedPaymentMethod = "COD" | "GCASH" | "MAYA" | "CARD" | "TEST" | "MANUAL_TRANSFER";
   const [paymentMethod, setPaymentMethod] = React.useState<AllowedPaymentMethod>(
     paymentMode === "demo" ? "GCASH" : "COD"
   );
   const [orderNotes, setOrderNotes] = React.useState("");
+
+  const handleDeliveryMethodChange = (method: AllowedDeliveryMethod) => {
+    setDeliveryMethod(method);
+    if (method === "COURIER" && paymentMethod === "COD") {
+      setPaymentMethod(
+        paymentMode === "demo"
+          ? "GCASH"
+          : manualPaymentInstructions
+          ? "MANUAL_TRANSFER"
+          : "CARD"
+      );
+    }
+  };
 
   // Submission state
   const [isPending, setIsPending] = React.useState(false);
@@ -161,26 +202,38 @@ export function CheckoutForm({
       const resolvedCity =
         selectedCity === "__custom__" ? customCity.trim() : newAddress.city.trim();
 
-      if (!resolvedCity && selectedAddressId === "new") {
+      if (deliveryMethod !== "PICKUP" && !resolvedCity && selectedAddressId === "new") {
         setErrorMessage("Please enter a valid City / Municipality.");
         setIsPending(false);
         return;
       }
 
+      const effectivePaymentMethod =
+        deliveryMethod === "COURIER" && paymentMethod === "COD"
+          ? paymentMode === "demo"
+            ? "GCASH"
+            : manualPaymentInstructions
+            ? "MANUAL_TRANSFER"
+            : "CARD"
+          : paymentMethod;
+
       const payload = {
-        paymentMethod,
+        deliveryMethod,
+        paymentMethod: effectivePaymentMethod,
         notes: orderNotes.trim() || undefined,
-        ...(selectedAddressId !== "new"
+        ...(deliveryMethod === "PICKUP" && selectedAddressId === "new" && !resolvedCity
+          ? {}
+          : selectedAddressId !== "new"
           ? { addressId: selectedAddressId }
           : {
               newAddress: {
-                fullName: newAddress.fullName.trim(),
-                phone: newAddress.phone.trim(),
-                street: newAddress.street.trim(),
+                fullName: newAddress.fullName.trim() || userName || "Collector",
+                phone: newAddress.phone.trim() || "09000000000",
+                street: newAddress.street.trim() || "Store Pickup",
                 apartment: newAddress.apartment?.trim() || undefined,
-                city: resolvedCity,
-                province: newAddress.province.trim(),
-                postalCode: newAddress.postalCode.trim(),
+                city: resolvedCity || "Pickup",
+                province: newAddress.province.trim() || "Pickup",
+                postalCode: newAddress.postalCode.trim() || "0000",
                 saveToAccount: newAddress.saveToAccount,
               },
             }),
@@ -219,6 +272,23 @@ export function CheckoutForm({
     }
   };
 
+  const isPickupAvailable = Boolean(pickupAddress && pickupAddress.trim().length > 0);
+  const isLocalDeliveryAvailable = Boolean(localDeliveryAreas && localDeliveryAreas.trim().length > 0);
+
+  const isCodDisabled =
+    !codEnabled ||
+    deliveryMethod === "COURIER" ||
+    totalAmount > codMaxAmount;
+
+  let codDisabledReason = "";
+  if (!codEnabled) {
+    codDisabledReason = "Cash on Delivery is currently disabled.";
+  } else if (deliveryMethod === "COURIER") {
+    codDisabledReason = "Advance payment required for nationwide courier shipments.";
+  } else if (totalAmount > codMaxAmount) {
+    codDisabledReason = `Exceeds max COD limit of ${formatPrice(codMaxAmount, currencySymbol)}.`;
+  }
+
   return (
     <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
       {/* Left Column: Shipping & Payment Steps (7 cols) */}
@@ -237,15 +307,154 @@ export function CheckoutForm({
           </div>
         )}
 
-        {/* Step 1: Shipping Destination */}
+        {/* Step 1: Delivery Method */}
         <Card>
           <CardHeader className="border-b pb-4">
             <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
               <Truck className="h-4 w-4 text-primary" />
-              1. Delivery Address
+              1. Delivery Method
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Nationwide Courier */}
+              <label
+                className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                  deliveryMethod === "COURIER"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
+                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      value="COURIER"
+                      checked={deliveryMethod === "COURIER"}
+                      onChange={() => handleDeliveryMethodChange("COURIER")}
+                      className="h-4 w-4 text-primary accent-primary"
+                    />
+                    <span className="font-bold text-xs uppercase tracking-wide text-foreground">
+                      Courier
+                    </span>
+                  </div>
+                  <div className="font-mono text-xs font-semibold text-primary">
+                    {formatPrice(shippingFeeCourier, currencySymbol)}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                    Nationwide insured air &amp; land courier. Double-boxed with live tracking.
+                  </p>
+                </div>
+              </label>
+
+              {/* Local Delivery */}
+              <label
+                className={`relative flex flex-col justify-between p-4 rounded-xl border transition-all ${
+                  !isLocalDeliveryAvailable
+                    ? "opacity-60 cursor-not-allowed bg-secondary/30 border-dashed"
+                    : deliveryMethod === "LOCAL_DELIVERY"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs cursor-pointer"
+                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700 cursor-pointer"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      value="LOCAL_DELIVERY"
+                      disabled={!isLocalDeliveryAvailable}
+                      checked={deliveryMethod === "LOCAL_DELIVERY"}
+                      onChange={() => handleDeliveryMethodChange("LOCAL_DELIVERY")}
+                      className="h-4 w-4 text-primary accent-primary"
+                    />
+                    <span className="font-bold text-xs uppercase tracking-wide text-foreground">
+                      Local Express
+                    </span>
+                  </div>
+                  <div className="font-mono text-xs font-semibold text-primary">
+                    {formatPrice(shippingFeeLocal, currencySymbol)}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                    Dedicated express rider handover verified with 4-digit security PIN.
+                  </p>
+                  {!isLocalDeliveryAvailable && (
+                    <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground">
+                      No coverage set
+                    </Badge>
+                  )}
+                </div>
+              </label>
+
+              {/* Store Pickup */}
+              <label
+                className={`relative flex flex-col justify-between p-4 rounded-xl border transition-all ${
+                  !isPickupAvailable
+                    ? "opacity-60 cursor-not-allowed bg-secondary/30 border-dashed"
+                    : deliveryMethod === "PICKUP"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs cursor-pointer"
+                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700 cursor-pointer"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <input
+                      type="radio"
+                      name="deliveryMethod"
+                      value="PICKUP"
+                      disabled={!isPickupAvailable}
+                      checked={deliveryMethod === "PICKUP"}
+                      onChange={() => handleDeliveryMethodChange("PICKUP")}
+                      className="h-4 w-4 text-primary accent-primary"
+                    />
+                    <span className="font-bold text-xs uppercase tracking-wide text-foreground">
+                      Vault Pickup
+                    </span>
+                  </div>
+                  <div className="font-mono text-xs font-semibold text-emerald-500">
+                    FREE
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
+                    Collect directly from our store vault. Zero shipping fee. Valid ID required.
+                  </p>
+                  {!isPickupAvailable && (
+                    <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground">
+                      No pickup address set
+                    </Badge>
+                  )}
+                </div>
+              </label>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Step 2: Shipping Destination / Pickup Details */}
+        <Card>
+          <CardHeader className="border-b pb-4">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-primary" />
+              {deliveryMethod === "PICKUP" ? "2. Pickup Location" : "2. Delivery Address"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            {deliveryMethod === "PICKUP" ? (
+              <div className="p-4 rounded-xl border bg-secondary/20 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Store className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-xs">
+                    <div className="font-bold text-foreground">RareFinds Official Vault Location</div>
+                    <p className="text-muted-foreground whitespace-pre-line">{pickupAddress}</p>
+                    {pickupInstructions && (
+                      <p className="text-[11px] text-amber-500 font-medium pt-1">
+                        Notice: {pickupInstructions}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
             {savedAddresses.length > 0 && (
               <div className="space-y-3">
                 <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -511,15 +720,17 @@ export function CheckoutForm({
                 </div>
               );
             })()}
+            </>
+          )}
           </CardContent>
         </Card>
 
-        {/* Step 2: Payment Method */}
+        {/* Step 3: Payment Method */}
         <Card>
           <CardHeader className="border-b pb-4">
             <CardTitle className="text-sm font-bold uppercase tracking-wider flex items-center gap-2">
               <CreditCard className="h-4 w-4 text-primary" />
-              2. Payment Method
+              3. Payment Method
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
@@ -537,12 +748,14 @@ export function CheckoutForm({
             )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Option: COD (Always available) */}
+              {/* Option: COD */}
               <label
-                className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
-                  paymentMethod === "COD"
-                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
-                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                className={`relative flex flex-col justify-between p-4 rounded-xl border transition-all ${
+                  isCodDisabled
+                    ? "opacity-60 cursor-not-allowed bg-secondary/30 border-dashed"
+                    : paymentMethod === "COD"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs cursor-pointer"
+                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700 cursor-pointer"
                 }`}
               >
                 <div className="flex items-start justify-between">
@@ -551,6 +764,7 @@ export function CheckoutForm({
                       type="radio"
                       name="paymentMethod"
                       value="COD"
+                      disabled={isCodDisabled}
                       checked={paymentMethod === "COD"}
                       onChange={() => setPaymentMethod("COD")}
                       className="h-4 w-4 text-primary accent-primary"
@@ -560,15 +774,63 @@ export function CheckoutForm({
                       Cash on Delivery
                     </span>
                   </div>
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                    Official Delivery
-                  </Badge>
+                  {isCodDisabled ? (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground">
+                      Restricted
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                      Official Delivery
+                    </Badge>
+                  )}
                 </div>
 
                 <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-                  Pay cash upon courier inspection. Pair is allocated and processed for dispatch.
+                  {isCodDisabled
+                    ? codDisabledReason
+                    : "Pay cash upon courier inspection. Pair is allocated and processed for dispatch."}
+                  {codAllowedAreas && !isCodDisabled && (
+                    <span className="block text-[10px] text-muted-foreground/80 mt-1">
+                      Coverage: {codAllowedAreas}
+                    </span>
+                  )}
                 </p>
               </label>
+
+              {/* Option: Manual Bank / E-Wallet Transfer */}
+              {manualPaymentInstructions && (
+                <label
+                  className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                    paymentMethod === "MANUAL_TRANSFER"
+                      ? "border-amber-500 bg-amber-500/5 ring-1 ring-amber-500 shadow-xs"
+                      : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="MANUAL_TRANSFER"
+                        checked={paymentMethod === "MANUAL_TRANSFER"}
+                        onChange={() => setPaymentMethod("MANUAL_TRANSFER")}
+                        className="h-4 w-4 text-amber-500 accent-amber-500"
+                      />
+                      <span className="font-bold text-xs uppercase tracking-wide text-foreground flex items-center gap-1.5">
+                        <Banknote className="h-3.5 w-3.5 text-amber-500" />
+                        Manual Transfer
+                      </span>
+                    </div>
+                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                      Hold &amp; Verify
+                    </Badge>
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                    Direct GCash or Bank transfer. Upload receipt after order; pair reserved pending staff review.
+                  </p>
+                </label>
+              )}
 
               {/* Demo Payment Methods (Shown when paymentMode === 'demo') */}
               {paymentMode === "demo" && (
@@ -752,7 +1014,9 @@ export function CheckoutForm({
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    Insured Express Shipping
+                    {deliveryMethod === "PICKUP" && "In-Store Vault Pickup"}
+                    {deliveryMethod === "LOCAL_DELIVERY" && "Local Express Delivery"}
+                    {deliveryMethod === "COURIER" && "Insured Courier Shipping"}
                     <ShieldCheck className="h-3 w-3 text-emerald-500" />
                   </span>
                   {shippingFee > 0 ? (
@@ -820,6 +1084,7 @@ export function CheckoutForm({
                   <>
                     <Lock className="h-4 w-4" />
                     {paymentMethod === "COD" && `Place Order (COD) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "MANUAL_TRANSFER" && `Place Order (Manual Transfer) • ${formatPrice(totalAmount, currencySymbol)}`}
                     {paymentMethod === "GCASH" && `Pay with GCash (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
                     {paymentMethod === "MAYA" && `Pay with Maya (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
                     {paymentMethod === "CARD" && `Pay with Card (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}

@@ -85,6 +85,11 @@ export async function completeOrderPayment(
         ? isSimulated
         : order.isSimulated || order.paymentMethod !== PaymentMethod.COD;
 
+    const paymentRef =
+      paymentReference ||
+      order.paymentReference ||
+      `DEMO-${order.paymentMethod}-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
     // Update order status and payment details
     const updatedOrder = await tx.order.update({
       where: { id: orderId },
@@ -93,10 +98,33 @@ export async function completeOrderPayment(
         paymentStatus: PaymentStatus.PAID,
         paidAt: new Date(),
         isSimulated: markSimulated,
-        paymentReference:
-          paymentReference ||
-          order.paymentReference ||
-          `DEMO-${order.paymentMethod}-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+        paymentReference: paymentRef,
+      },
+    });
+
+    // Record or update the Payment ledger entry atomically (unique guard on [orderId, method])
+    await tx.payment.upsert({
+      where: {
+        orderId_method: {
+          orderId: order.id,
+          method: order.paymentMethod,
+        },
+      },
+      update: {
+        status: PaymentStatus.PAID,
+        amount: order.totalAmount,
+        reference: paymentRef,
+        isSimulated: markSimulated,
+        paidAt: new Date(),
+      },
+      create: {
+        orderId: order.id,
+        method: order.paymentMethod,
+        amount: order.totalAmount,
+        status: PaymentStatus.PAID,
+        reference: paymentRef,
+        isSimulated: markSimulated,
+        paidAt: new Date(),
       },
     });
 

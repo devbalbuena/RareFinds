@@ -37,6 +37,7 @@ model User {
   addresses        Address[]
   auditLogs        AuditLog[]
   stockAdjustments StockAdjustment[]
+  qcOrders         Order[]           @relation("OrderQcVerifier")
 
   @@map("users")
 }
@@ -255,41 +256,65 @@ enum PaymentMethod {
   GCASH
   MAYA
   CARD
+  MANUAL_TRANSFER
+}
+
+enum DeliveryMethod {
+  PICKUP
+  LOCAL_DELIVERY
+  COURIER
 }
 
 model Order {
-  id               String        @id @default(cuid())
-  orderNumber      String        @unique // e.g. "RF-20261018-0001"
-  userId           String?
-  user             User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
-  customerEmail    String
-  customerName     String
-  customerPhone    String?
-  shippingAddress  Json          // Street, Apartment/Unit, City, Province, PostalCode, Country
-  subtotal         Decimal       @db.Decimal(10, 2)
-  shippingFee      Decimal       @default(0) @db.Decimal(10, 2)
-  totalAmount      Decimal       @db.Decimal(10, 2)
-  status           OrderStatus   @default(PENDING_PAYMENT)
-  paymentStatus    PaymentStatus @default(UNPAID)
-  paymentMethod    PaymentMethod @default(TEST)
-  paymentReference String?       // Payment intent ID, transaction ref, or simulation ref
-  isSimulated      Boolean       @default(false)
-  trackingNumber   String?
-  shippingCarrier  String?       // e.g. "LBC", "J&T Express", "DHL"
-  notes            String?       @db.Text
-  expiresAt        DateTime?     // For 15-minute reservation window
-  paidAt           DateTime?
-  shippedAt        DateTime?
-  deliveredAt      DateTime?
-  cancelledAt      DateTime?
-  items            OrderItem[]
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                     String         @id @default(cuid())
+  orderNumber            String         @unique // e.g. "RF-20261018-0001"
+  userId                 String?
+  user                   User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  customerEmail          String
+  customerName           String
+  customerPhone          String?
+  shippingAddress        Json           // Street, Apartment/Unit, City, Province, PostalCode, Country
+  deliveryMethod         DeliveryMethod
+  deliveryPin            String?
+  deliveryPinAttempts    Int            @default(0)
+  subtotal               Decimal        @db.Decimal(10, 2)
+  shippingFee            Decimal        @default(0) @db.Decimal(10, 2)
+  totalAmount            Decimal        @db.Decimal(10, 2)
+  status                 OrderStatus    @default(PENDING_PAYMENT)
+  paymentStatus          PaymentStatus  @default(UNPAID)
+  paymentMethod          PaymentMethod  @default(TEST)
+  paymentReference       String?        // Payment intent ID, transaction ref, or simulation ref
+  isSimulated            Boolean        @default(false)
+  trackingNumber         String?
+  shippingCarrier        String?        // e.g. "LBC", "J&T Express", "DHL"
+  notes                  String?        @db.Text
+  expiresAt              DateTime?      // For reservation window
+  paidAt                 DateTime?
+  qcVerifiedAt           DateTime?
+  qcVerifiedById         String?
+  qcVerifiedBy           User?          @relation("OrderQcVerifier", fields: [qcVerifiedById], references: [id], onDelete: SetNull)
+  shippedAt              DateTime?
+  deliveredAt            DateTime?
+  customerConfirmedAt    DateTime?
+  problemReportedAt      DateTime?
+  problemReason          String?        @db.Text
+  proofOfDeliveryKey     String?
+  paymentProofKey        String?
+  paymentProofUploadedAt DateTime?
+  paymentProofRejections Int            @default(0)
+  paymentReviewFlag      Boolean        @default(false)
+  autoCompleteAt         DateTime?
+  cancelledAt            DateTime?
+  items                  OrderItem[]
+  payments               Payment[]
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
 
   @@index([userId])
   @@index([orderNumber])
   @@index([status])
   @@index([isSimulated])
+  @@index([deliveryMethod])
   @@map("orders")
 }
 
@@ -303,12 +328,37 @@ model OrderItem {
   variantDetails  String          // Snapshot e.g. "Size US 10.5 • DS • Style: 555088-101"
   productImageUrl String?
   unitPrice       Decimal         @db.Decimal(10, 2)
+  unitCost        Decimal?        @db.Decimal(10, 2) // Snapshot of costPrice at order time
   quantity        Int             @default(1)
   subtotal        Decimal         @db.Decimal(10, 2)
 
   @@index([orderId])
   @@index([variantId])
   @@map("order_items")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  method          PaymentMethod
+  amount          Decimal       @db.Decimal(10, 2)
+  status          PaymentStatus @default(UNPAID)
+  reference       String?
+  isSimulated     Boolean       @default(false)
+  paidAt          DateTime?
+  proofKey        String?
+  rejectionReason String?
+  verifiedById    String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@unique([orderId, method])
+  @@index([orderId])
+  @@index([status])
+  @@index([isSimulated])
+  @@index([createdAt])
+  @@map("payments")
 }
 
 // -----------------------------------------------------------------------------
@@ -370,18 +420,30 @@ model Address {
 // -----------------------------------------------------------------------------
 
 model StoreSettings {
-  id             String   @id @default("default")
-  storeName      String   @default("RareFinds")
-  storeTagline   String?  @default("Rare & Limited Sneaker Vault")
-  logoUrl        String?
-  contactEmail   String   @default("contact@rarefinds.ph")
-  contactPhone   String?  @default("+63 917 123 4567")
-  address        String?  @default("Manila, Philippines")
-  currency       String   @default("PHP")
-  currencySymbol String   @default("₱")
-  shippingFee    Decimal  @default(0.00) @db.Decimal(10, 2)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                        String   @id @default("default")
+  storeName                 String   @default("RareFinds")
+  storeTagline              String?  @default("Rare & Limited Sneaker Vault")
+  logoUrl                   String?
+  contactEmail              String   @default("contact@rarefinds.ph")
+  contactPhone              String?  @default("+63 917 123 4567")
+  address                   String?  @default("Manila, Philippines")
+  currency                  String   @default("PHP")
+  currencySymbol            String   @default("₱")
+  shippingFee               Decimal  @default(0.00) @db.Decimal(10, 2)
+  shippingFeeLocal          Decimal  @default(150.00) @db.Decimal(10, 2)
+  shippingFeeCourier        Decimal  @default(250.00) @db.Decimal(10, 2)
+  pickupAddress             String?
+  pickupInstructions        String?
+  localDeliveryAreas        String?
+  codEnabled                Boolean  @default(false)
+  codAllowedAreas           String?
+  codMaxAmount              Decimal  @default(20000.00) @db.Decimal(10, 2)
+  manualPaymentInstructions String?  @db.Text
+  manualPaymentQrKey        String?
+  manualPaymentHoldMinutes  Int      @default(60)
+  autoCompleteDays          Int      @default(3)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   @@map("store_settings")
 }

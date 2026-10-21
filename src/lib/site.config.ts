@@ -8,6 +8,18 @@ export interface SiteConfig {
   currency: string;
   currencySymbol: string;
   shippingFee: number;
+  shippingFeeLocal: number;
+  shippingFeeCourier: number;
+  pickupAddress: string | null;
+  pickupInstructions: string | null;
+  localDeliveryAreas: string | null;
+  codEnabled: boolean;
+  codAllowedAreas: string | null;
+  codMaxAmount: number;
+  manualPaymentInstructions: string | null;
+  manualPaymentQrKey: string | null;
+  manualPaymentHoldMinutes: number;
+  autoCompleteDays: number;
 }
 
 export const defaultSiteConfig: SiteConfig = {
@@ -20,4 +32,16 @@ export const defaultSiteConfig: SiteConfig = {
   currency: "PHP",
   currencySymbol: "₱",
   shippingFee: 0,
+  shippingFeeLocal: 150,
+  shippingFeeCourier: 250,
+  pickupAddress: null,
+  pickupInstructions: null,
+  localDeliveryAreas: null,
+  codEnabled: false,
+  codAllowedAreas: null,
+  codMaxAmount: 20000,
+  manualPaymentInstructions: null,
+  manualPaymentQrKey: null,
+  manualPaymentHoldMinutes: 60,
+  autoCompleteDays: 3,
 };

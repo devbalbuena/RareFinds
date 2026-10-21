@@ -29,6 +29,17 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
     currency: initialSettings.currency,
     currencySymbol: initialSettings.currencySymbol,
     shippingFee: initialSettings.shippingFee,
+    shippingFeeLocal: initialSettings.shippingFeeLocal ?? 150,
+    shippingFeeCourier: initialSettings.shippingFeeCourier ?? 250,
+    pickupAddress: initialSettings.pickupAddress || "",
+    pickupInstructions: initialSettings.pickupInstructions || "",
+    localDeliveryAreas: initialSettings.localDeliveryAreas || "",
+    codEnabled: initialSettings.codEnabled ?? false,
+    codAllowedAreas: initialSettings.codAllowedAreas || "",
+    codMaxAmount: initialSettings.codMaxAmount ?? 20000,
+    manualPaymentInstructions: initialSettings.manualPaymentInstructions || "",
+    manualPaymentHoldMinutes: initialSettings.manualPaymentHoldMinutes ?? 60,
+    autoCompleteDays: initialSettings.autoCompleteDays ?? 3,
   });
 
   const [isPending, setIsPending] = React.useState(false);
@@ -51,6 +62,17 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
       currency: formData.currency.trim(),
       currencySymbol: formData.currencySymbol.trim(),
       shippingFee: Number(formData.shippingFee),
+      shippingFeeLocal: Number(formData.shippingFeeLocal),
+      shippingFeeCourier: Number(formData.shippingFeeCourier),
+      pickupAddress: formData.pickupAddress.trim() || null,
+      pickupInstructions: formData.pickupInstructions.trim() || null,
+      localDeliveryAreas: formData.localDeliveryAreas.trim() || null,
+      codEnabled: formData.codEnabled,
+      codAllowedAreas: formData.codAllowedAreas.trim() || null,
+      codMaxAmount: Number(formData.codMaxAmount),
+      manualPaymentInstructions: formData.manualPaymentInstructions.trim() || null,
+      manualPaymentHoldMinutes: Number(formData.manualPaymentHoldMinutes),
+      autoCompleteDays: Number(formData.autoCompleteDays),
     });
 
     setIsPending(false);
@@ -192,11 +214,11 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
         <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
           <Coins className="h-4 w-4 text-emerald-600" />
           <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-900">
-            Currency &amp; Base Shipping
+            Currency &amp; Delivery Methods
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Currency Code *
@@ -229,23 +251,230 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
-              Standard Shipping Fee *
+              Local Rider Shipping Fee (₱) *
             </label>
             <Input
               required
               type="number"
               min="0"
               step="1"
-              value={formData.shippingFee}
+              value={formData.shippingFeeLocal}
               onChange={(e) =>
-                setFormData({ ...formData, shippingFee: Number(e.target.value) })
+                setFormData({ ...formData, shippingFeeLocal: Number(e.target.value) })
               }
-              placeholder="0 for Free Delivery"
+              placeholder="150"
               className="h-10 text-xs bg-white border-zinc-300 text-zinc-900 font-mono"
             />
             <p className="text-[10px] text-zinc-500">
-              Set to 0 for complimentary insured shipping.
+              Applied for Same-Day Local Delivery (Grab, Lalamove, Maxim).
             </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+              Nationwide Courier Shipping Fee (₱) *
+            </label>
+            <Input
+              required
+              type="number"
+              min="0"
+              step="1"
+              value={formData.shippingFeeCourier}
+              onChange={(e) =>
+                setFormData({ ...formData, shippingFeeCourier: Number(e.target.value) })
+              }
+              placeholder="250"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900 font-mono"
+            />
+            <p className="text-[10px] text-zinc-500">
+              Applied for nationwide express couriers (LBC, J&amp;T, 2GO).
+            </p>
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+              Local Delivery Serviced Areas (Exact Match)
+            </label>
+            <Input
+              value={formData.localDeliveryAreas}
+              onChange={(e) =>
+                setFormData({ ...formData, localDeliveryAreas: e.target.value })
+              }
+              placeholder="Metro Manila, San Juan, Quezon City, Makati, Taguig, Pasig, Mandaluyong, Manila"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
+            />
+            <p className="text-[10px] text-zinc-500">
+              Comma-separated cities or provinces where local same-day delivery is available. Leave empty to disable local delivery.
+            </p>
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+              Vault Pickup Address
+            </label>
+            <Input
+              value={formData.pickupAddress}
+              onChange={(e) => setFormData({ ...formData, pickupAddress: e.target.value })}
+              placeholder="RareFinds Vault, 4F Greenhills Mall, San Juan, Metro Manila"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
+            />
+            <p className="text-[10px] text-zinc-500">
+              {formData.pickupAddress.trim()
+                ? "✓ Store pickup is currently AVAILABLE at checkout (Free ₱0)."
+                : "⚠️ Store pickup is UNAVAILABLE at checkout until an address is filled in."}
+            </p>
+          </div>
+
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+              Store Pickup Instructions
+            </label>
+            <Input
+              value={formData.pickupInstructions}
+              onChange={(e) =>
+                setFormData({ ...formData, pickupInstructions: e.target.value })
+              }
+              placeholder="Present your Order Reference and 1 valid government ID upon collection."
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Section 4: Cash on Delivery (COD) Rules */}
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4 shadow-xs">
+        <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
+          <div className="flex items-center gap-2">
+            <Coins className="h-4 w-4 text-purple-600" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-900">
+              Cash on Delivery (COD) Safeguards
+            </h2>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-zinc-800">
+            <input
+              type="checkbox"
+              checked={formData.codEnabled}
+              onChange={(e) => setFormData({ ...formData, codEnabled: e.target.checked })}
+              className="h-4 w-4 rounded border-zinc-300 text-amber-500 focus:ring-amber-400"
+            />
+            Enable COD
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5 sm:col-span-2">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+              Allowed COD Areas (Local / Pickup Only)
+            </label>
+            <Input
+              value={formData.codAllowedAreas}
+              onChange={(e) => setFormData({ ...formData, codAllowedAreas: e.target.value })}
+              placeholder="Metro Manila, San Juan, Quezon City, Makati, Taguig, Pasig, Mandaluyong, Manila"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
+            />
+            <p className="text-[10px] text-zinc-500">
+              Comma-separated list of cities or provinces. Nationwide courier orders cannot use COD.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+              Maximum COD Order Total (₱) *
+            </label>
+            <Input
+              required
+              type="number"
+              min="1000"
+              step="500"
+              value={formData.codMaxAmount}
+              onChange={(e) =>
+                setFormData({ ...formData, codMaxAmount: Number(e.target.value) })
+              }
+              placeholder="20000"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900 font-mono"
+            />
+            <p className="text-[10px] text-zinc-500">
+              Orders whose grand total (including shipping) exceeds this threshold must be prepaid.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Section 5: Manual Bank & GCash Transfer */}
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4 shadow-xs">
+        <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+          <Coins className="h-4 w-4 text-indigo-600" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-900">
+            Manual Bank &amp; GCash Transfer
+          </h2>
+        </div>
+
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+              Payment Instructions &amp; Account Details
+            </label>
+            <textarea
+              rows={4}
+              value={formData.manualPaymentInstructions}
+              onChange={(e) =>
+                setFormData({ ...formData, manualPaymentInstructions: e.target.value })
+              }
+              placeholder="GCash: 0917-123-4567 (RareFinds Manila)&#10;BDO Unibank: 0012-3456-7890 (RareFinds Sneaker Vault Inc.)"
+              className="w-full text-xs p-3 rounded-xl border border-zinc-300 bg-white text-zinc-900 font-mono leading-relaxed"
+            />
+            <p className="text-[10px] text-zinc-500">
+              {formData.manualPaymentInstructions.trim()
+                ? "✓ Manual Transfer is AVAILABLE at checkout. Customers can upload transfer receipts."
+                : "⚠️ Manual Transfer is UNAVAILABLE at checkout until payment instructions are set."}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+                Hold Reservation Expiry (Minutes) *
+              </label>
+              <Input
+                required
+                type="number"
+                min="15"
+                max="1440"
+                value={formData.manualPaymentHoldMinutes}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    manualPaymentHoldMinutes: Number(e.target.value),
+                  })
+                }
+                placeholder="60"
+                className="h-10 text-xs bg-white border-zinc-300 text-zinc-900 font-mono"
+              />
+              <p className="text-[10px] text-zinc-500">
+                Reservation hold window for customer to upload transfer receipt.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+                Auto-Complete Delivery (Days) *
+              </label>
+              <Input
+                required
+                type="number"
+                min="1"
+                max="30"
+                value={formData.autoCompleteDays}
+                onChange={(e) =>
+                  setFormData({ ...formData, autoCompleteDays: Number(e.target.value) })
+                }
+                placeholder="3"
+                className="h-10 text-xs bg-white border-zinc-300 text-zinc-900 font-mono"
+              />
+              <p className="text-[10px] text-zinc-500">
+                Days after staff marks delivered before an untouched order auto-completes.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -261,7 +490,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
           ) : (
             <Save className="h-4 w-4" />
           )}
-          <span>Save Configuration</span>
+          <span>Save Store Configuration</span>
         </Button>
       </div>
     </form>
