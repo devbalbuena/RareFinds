@@ -20,6 +20,7 @@ interface OrderSuccessActionsProps {
   initialPaymentStatus: string;
   paymentMethod: string;
   expiresAt: string | null;
+  isSimulated?: boolean;
 }
 
 export function OrderSuccessActions({
@@ -27,6 +28,7 @@ export function OrderSuccessActions({
   initialStatus,
   paymentMethod,
   expiresAt,
+  isSimulated,
 }: OrderSuccessActionsProps) {
   const router = useRouter();
   const [status, setStatus] = React.useState(initialStatus);
@@ -133,7 +135,7 @@ export function OrderSuccessActions({
       )}
 
       {/* Dynamic State Banner */}
-      {status === "PENDING_PAYMENT" && paymentMethod === "TEST" && (
+      {status === "PENDING_PAYMENT" && ["TEST", "GCASH", "MAYA", "CARD"].includes(paymentMethod) && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-1">
@@ -222,18 +224,31 @@ export function OrderSuccessActions({
       )}
 
       {status === "PAID" && (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500 shrink-0">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="text-xs font-bold uppercase tracking-wider text-emerald-500">
-              Payment Confirmed &amp; Grails Secured
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-500 shrink-0">
+              <CheckCircle2 className="h-5 w-5" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Your order is locked in. Our team in Manila is preparing express double-boxed dispatch.
-            </p>
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider text-emerald-500">
+                Payment Confirmed &amp; Grails Secured
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Your order is locked in. Our team in Manila is preparing express double-boxed dispatch.
+              </p>
+            </div>
           </div>
+          {isSimulated && (
+            <Button
+              onClick={handleCancelOrder}
+              disabled={isCancelling}
+              variant="outline"
+              size="sm"
+              className="text-xs text-amber-500 border-amber-500/30 hover:bg-amber-500/10 cursor-pointer self-start sm:self-auto shrink-0"
+            >
+              {isCancelling ? "Cancelling..." : "Cancel Demo Order (Restock)"}
+            </Button>
+          )}
         </div>
       )}
 

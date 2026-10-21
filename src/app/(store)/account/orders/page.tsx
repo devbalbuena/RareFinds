@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { cleanupExpiredOrders } from "@/lib/orders/expiry";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
 import {
@@ -176,18 +177,23 @@ export default async function OrderHistoryPage() {
                         </span>
                         <span>•</span>
                         <span className="flex items-center gap-1">
-                          {order.paymentMethod === "TEST" ? (
-                            <>
-                              <CreditCard className="h-3 w-3 text-amber-500" />
-                              <span>Test Payment</span>
-                            </>
-                          ) : (
+                          {order.paymentMethod === "COD" ? (
                             <>
                               <Banknote className="h-3 w-3 text-emerald-500" />
                               <span>Cash on Delivery</span>
                             </>
+                          ) : (
+                            <>
+                              <CreditCard className="h-3 w-3 text-purple-400" />
+                              <span>{order.paymentMethod} (Demo)</span>
+                            </>
                           )}
                         </span>
+                        {order.isSimulated && (
+                          <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/30 text-[9px] py-0 px-1 font-semibold uppercase">
+                            DEMO PAYMENT
+                          </Badge>
+                        )}
                       </div>
                     </div>
 

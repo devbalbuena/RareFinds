@@ -138,6 +138,11 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
               >
                 {statusInfo.label}
               </span>
+              {order.isSimulated && (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border border-purple-500/30 bg-purple-500/10 text-purple-400">
+                  DEMO PAYMENT
+                </span>
+              )}
             </div>
             <p className="text-xs text-muted-foreground flex items-center gap-2">
               <Calendar className="h-3.5 w-3.5" />
@@ -278,7 +283,9 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
               <div className="flex justify-between text-muted-foreground">
                 <span>Payment Method</span>
                 <span className="font-semibold text-foreground">
-                  {order.paymentMethod === "TEST" ? "Test Payment (Simulated)" : "Cash on Delivery (COD)"}
+                  {order.paymentMethod === "COD"
+                    ? "Cash on Delivery (COD)"
+                    : `${order.paymentMethod} (Demo Payment)`}
                 </span>
               </div>
               {order.paymentReference && (

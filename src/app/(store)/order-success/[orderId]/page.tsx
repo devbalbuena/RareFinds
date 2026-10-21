@@ -89,6 +89,11 @@ export default async function OrderSuccessPage(props: OrderSuccessPageProps) {
               <Badge variant={statusVariantMap[order.status] || "secondary"} className="text-xs">
                 {order.status.replace(/_/g, " ")}
               </Badge>
+              {order.isSimulated && (
+                <Badge variant="outline" className="border-amber-500/50 text-amber-500 bg-amber-500/10 text-[10px] font-mono uppercase tracking-wider">
+                  DEMO PAYMENT
+                </Badge>
+              )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight">
               {order.orderNumber}
@@ -130,6 +135,7 @@ export default async function OrderSuccessPage(props: OrderSuccessPageProps) {
         initialPaymentStatus={order.paymentStatus}
         paymentMethod={order.paymentMethod}
         expiresAt={order.expiresAt ? order.expiresAt.toISOString() : null}
+        isSimulated={order.isSimulated}
       />
 
       {/* Visual Courier Fulfillment Journey & Tracking */}
@@ -240,7 +246,15 @@ export default async function OrderSuccessPage(props: OrderSuccessPageProps) {
               <div className="flex justify-between text-muted-foreground">
                 <span>Payment Method</span>
                 <span className="font-semibold text-foreground">
-                  {order.paymentMethod === "TEST" ? "Test Payment (Simulated)" : "Cash on Delivery (COD)"}
+                  {order.paymentMethod === "GCASH"
+                    ? "GCash (Demo)"
+                    : order.paymentMethod === "MAYA"
+                    ? "Maya (Demo)"
+                    : order.paymentMethod === "CARD"
+                    ? "Credit/Debit Card (Demo)"
+                    : order.paymentMethod === "TEST"
+                    ? "Test Payment (Simulated)"
+                    : "Cash on Delivery (COD)"}
                 </span>
               </div>
               <div className="border-t pt-2 flex justify-between font-bold text-sm text-foreground">
