@@ -59,6 +59,7 @@ export interface SerializedAdminOrder {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   paymentReference: string | null;
+  isSimulated: boolean;
   trackingNumber: string | null;
   shippingCarrier: string | null;
   notes: string | null;
@@ -204,6 +205,7 @@ export async function getAdminOrdersAction(params: GetAdminOrdersParams = {}) {
     paymentStatus: o.paymentStatus,
     paymentMethod: o.paymentMethod,
     paymentReference: o.paymentReference,
+    isSimulated: o.isSimulated,
     trackingNumber: o.trackingNumber,
     shippingCarrier: o.shippingCarrier,
     notes: o.notes,
@@ -303,6 +305,7 @@ export async function getAdminOrderByIdAction(orderId: string) {
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
     paymentReference: order.paymentReference,
+    isSimulated: order.isSimulated,
     trackingNumber: order.trackingNumber,
     shippingCarrier: order.shippingCarrier,
     notes: order.notes,
@@ -440,7 +443,7 @@ export async function updateOrderStatusAction(input: z.infer<typeof updateStatus
     safeRevalidatePath("/account/orders");
     safeRevalidatePath(`/account/orders/${orderId}`);
 
-    return { success: true, order: updated };
+    return { success: true, orderId: updated.id, status: updated.status };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update order status.";
     return { error: msg };
@@ -518,7 +521,7 @@ export async function updateOrderTrackingAction(input: z.infer<typeof updateTrac
     safeRevalidatePath("/account/orders");
     safeRevalidatePath(`/account/orders/${orderId}`);
 
-    return { success: true, order: updated };
+    return { success: true, orderId: updated.id, status: updated.status };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to update tracking.";
     return { error: msg };
@@ -641,7 +644,7 @@ export async function cancelOrderAdminAction(orderId: string, reason: string) {
     safeRevalidatePath(`/account/orders/${orderId}`);
     safeRevalidatePath("/products");
 
-    return { success: true, order: result };
+    return { success: true, orderId: result.id, status: result.status };
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : "Failed to cancel order.";
     return { error: msg };
