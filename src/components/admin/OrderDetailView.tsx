@@ -21,6 +21,7 @@ import {
   Calendar,
   Sparkles,
   History,
+  ShieldCheck,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import {
@@ -70,42 +71,42 @@ const ORDER_STATUS_CONFIG: Record<
 > = {
   PENDING_PAYMENT: {
     label: "Pending Payment",
-    badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
     desc: "Awaiting customer payment confirmation.",
   },
   PENDING: {
-    label: "Pending",
-    badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    label: "Pending Confirmation",
+    badgeClass: "bg-amber-50 text-amber-800 border-amber-200",
     desc: "Order placed and waiting for fulfillment confirmation.",
   },
   PROCESSING: {
-    label: "Processing",
-    badgeClass: "bg-blue-500/10 text-blue-400 border-blue-500/20",
+    label: "Processing & QC",
+    badgeClass: "bg-blue-50 text-blue-800 border-blue-200",
     desc: "Items are being retrieved from the vault and authenticated.",
   },
   PAID: {
     label: "Paid",
-    badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    badgeClass: "bg-emerald-50 text-emerald-800 border-emerald-200",
     desc: "Payment has been settled.",
   },
   SHIPPED: {
-    label: "Shipped",
-    badgeClass: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+    label: "Dispatched",
+    badgeClass: "bg-purple-50 text-purple-800 border-purple-200",
     desc: "Order is in transit with designated courier.",
   },
   DELIVERED: {
     label: "Delivered",
-    badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    badgeClass: "bg-emerald-50 text-emerald-800 border-emerald-300 font-bold",
     desc: "Package safely handed to the buyer.",
   },
   CANCELLED: {
     label: "Cancelled",
-    badgeClass: "bg-zinc-800 text-zinc-400 border-zinc-700",
+    badgeClass: "bg-zinc-100 text-zinc-600 border-zinc-200",
     desc: "Order cancelled and items returned to stock inventory.",
   },
   EXPIRED: {
     label: "Expired",
-    badgeClass: "bg-red-500/10 text-red-400 border-red-500/20",
+    badgeClass: "bg-red-50 text-red-700 border-red-200",
     desc: "Reservation timer expired before payment.",
   },
 };
@@ -150,7 +151,7 @@ export function OrderDetailView({
 
   const statusInfo = ORDER_STATUS_CONFIG[order.status] || {
     label: order.status,
-    badgeClass: "bg-zinc-800 text-zinc-400 border-zinc-700",
+    badgeClass: "bg-zinc-100 text-zinc-600 border-zinc-200",
     desc: "",
   };
 
@@ -165,6 +166,7 @@ export function OrderDetailView({
 
   const timeline = [
     {
+      step: 1,
       title: "Order Placed",
       description: "Order received in system.",
       date: order.createdAt,
@@ -172,6 +174,7 @@ export function OrderDetailView({
       current: order.status === "PENDING" || order.status === "PENDING_PAYMENT",
     },
     {
+      step: 2,
       title: "Processing & QC",
       description: order.paymentStatus === "PAID" ? "Payment secured & QC verified" : "Awaiting vault authentication",
       date: order.paidAt || (isProcessing ? order.updatedAt : null),
@@ -179,6 +182,7 @@ export function OrderDetailView({
       current: order.status === "PROCESSING" || order.status === "PAID",
     },
     {
+      step: 3,
       title: "Dispatched",
       description: order.shippingCarrier
         ? `${order.shippingCarrier} (${order.trackingNumber || "Assigned"})`
@@ -188,11 +192,12 @@ export function OrderDetailView({
       current: order.status === "SHIPPED",
     },
     {
+      step: 4,
       title: isCancelled ? "Order Cancelled" : "Delivered",
       description: isCancelled
         ? "Items returned to inventory"
         : isDelivered
-        ? "Package handed over to recipient"
+        ? "Package handed over to recipient (Signed POD)"
         : "Final destination delivery",
       date: isCancelled ? order.cancelledAt : order.deliveredAt,
       completed: isDelivered || isCancelled,
@@ -242,6 +247,54 @@ export function OrderDetailView({
     } else {
       setIsStatusModalOpen(false);
       setFeedback({ type: "success", message: `Order status updated to ${newStatus}` });
+      router.refresh();
+    }
+  }
+
+  // Quick Action: Confirm QC & Move to Processing
+  async function handleQuickProcessing() {
+    setIsUpdatingStatus(true);
+    setFeedback(null);
+    const res = await updateOrderStatusAction({
+      orderId: order.id,
+      status: "PROCESSING",
+      notes: "Staff verified order details and vault specimen allocated for QC inspection.",
+    });
+    setIsUpdatingStatus(false);
+    if (res.error) {
+      setFeedback({ type: "error", message: res.error });
+    } else {
+      setFeedback({ type: "success", message: "Order advanced to Processing & QC." });
+      router.refresh();
+    }
+  }
+
+  // Quick Action: Mark Delivered
+  async function handleQuickMarkDelivered() {
+    if (
+      !confirm(
+        "Confirm that this order has been successfully delivered to the customer?\n\n(If COD, payment will automatically be marked as settled)"
+      )
+    ) {
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+    setFeedback(null);
+    const res = await updateOrderStatusAction({
+      orderId: order.id,
+      status: "DELIVERED",
+      notes: "Courier delivered package to customer. Proof of delivery (POD) verified.",
+    });
+
+    setIsUpdatingStatus(false);
+    if (res.error) {
+      setFeedback({ type: "error", message: res.error });
+    } else {
+      setFeedback({
+        type: "success",
+        message: "Order marked as DELIVERED! Delivery timestamp recorded and COD reconciled.",
+      });
       router.refresh();
     }
   }
@@ -458,30 +511,35 @@ export function OrderDetailView({
         </div>
       </div>
 
-      {/* ── SCREEN INTERFACE (INTERACTIVE ADMIN VIEW) ────────────────────────── */}
-      <div className="print:hidden p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* ── SCREEN INTERFACE (CLEAN WHITE/LIGHT THEME) ────────────────────────── */}
+      <div className="print:hidden p-6 md:p-8 max-w-7xl mx-auto space-y-6 text-zinc-900">
         {/* Navigation & Actions Top Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-800">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200">
           <div className="flex items-center gap-3">
             <Link
               href="/admin/orders"
-              className="p-2 rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 hover:text-white hover:border-zinc-700 transition"
+              className="p-2 rounded-xl bg-white border border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 shadow-2xs transition"
               title="Back to Orders List"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div>
               <div className="flex items-center gap-2.5">
-                <h1 className="text-2xl font-bold font-mono tracking-tight text-white">
+                <h1 className="text-2xl font-bold font-mono tracking-tight text-zinc-900">
                   {order.orderNumber}
                 </h1>
                 <span
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium border ${statusInfo.badgeClass}`}
+                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border ${statusInfo.badgeClass}`}
                 >
                   {statusInfo.label}
                 </span>
+                {order.isSimulated && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold border bg-purple-50 text-purple-700 border-purple-200">
+                    DEMO PAYMENT
+                  </span>
+                )}
               </div>
-              <p className="text-xs text-zinc-400 mt-0.5">
+              <p className="text-xs text-zinc-500 mt-0.5">
                 Placed on{" "}
                 {new Date(order.createdAt).toLocaleDateString("en-US", {
                   year: "numeric",
@@ -498,35 +556,60 @@ export function OrderDetailView({
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-200 hover:bg-zinc-850 hover:text-white hover:border-zinc-700 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-white border border-zinc-200 text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 shadow-2xs transition"
             >
-              <Printer className="w-3.5 h-3.5 text-zinc-400" />
-              Print Packing Slip & Invoice
+              <Printer className="w-3.5 h-3.5 text-zinc-500" />
+              Print Invoice
             </button>
 
             {order.status !== "CANCELLED" && (
               <>
+                {/* 1. Advance Pending -> Processing */}
+                {order.status === "PENDING" && (
+                  <button
+                    onClick={handleQuickProcessing}
+                    disabled={isUpdatingStatus}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-xs transition"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Confirm & Start QC
+                  </button>
+                )}
+
+                {/* 2. Assign Courier & Ship */}
                 <button
                   onClick={() => setIsTrackingModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 transition"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition"
                 >
                   <Truck className="w-3.5 h-3.5" />
-                  {order.shippingCarrier ? "Update Courier" : "Assign Courier"}
+                  {order.shippingCarrier ? "Update Courier" : "Assign Courier & Ship"}
                 </button>
 
+                {/* 3. Mark as Delivered (Prominent when SHIPPED) */}
+                {order.status === "SHIPPED" && (
+                  <button
+                    onClick={handleQuickMarkDelivered}
+                    disabled={isUpdatingStatus}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    Mark as Delivered
+                  </button>
+                )}
+
+                {/* 4. Change Status */}
                 <button
-                  onClick={() => {
-                    setIsStatusModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 transition"
+                  onClick={() => setIsStatusModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 transition"
                 >
                   Change Status
                 </button>
 
+                {/* 5. Cancel Order */}
                 {order.status !== "DELIVERED" && (
                   <button
                     onClick={() => setIsCancelModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-500/10 border border-rose-500/30 text-rose-300 hover:bg-rose-500/20 transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 transition"
                   >
                     <XCircle className="w-3.5 h-3.5" />
                     Cancel Order
@@ -540,23 +623,23 @@ export function OrderDetailView({
         {/* Action Feedback alert */}
         {feedback && (
           <div
-            className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-sm ${
+            className={`p-4 rounded-xl border flex items-center justify-between gap-3 text-sm shadow-2xs ${
               feedback.type === "success"
-                ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
-                : "bg-rose-950/40 border-rose-500/40 text-rose-300"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-rose-50 border-rose-200 text-rose-800"
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 font-medium">
               {feedback.type === "success" ? (
-                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
               ) : (
-                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
               )}
               <span>{feedback.message}</span>
             </div>
             <button
               onClick={() => setFeedback(null)}
-              className="text-xs underline hover:no-underline"
+              className="text-xs font-semibold underline hover:no-underline text-zinc-600"
             >
               Dismiss
             </button>
@@ -564,47 +647,52 @@ export function OrderDetailView({
         )}
 
         {/* ── FULFILLMENT TIMELINE ────────────────────────────────────────── */}
-        <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-6">
-          <h2 className="text-sm font-semibold text-zinc-300 mb-6 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-400" />
-            Fulfillment Journey
-          </h2>
+        <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-xs">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-sm font-bold text-zinc-900 flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-500" />
+              <span>4-Step Fulfillment Lifecycle</span>
+            </h2>
+            <span className="text-xs text-zinc-500">
+              Real-time synchronization across Customer, Staff, and Admin roles
+            </span>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative">
-            {timeline.map((step, idx) => (
+            {timeline.map((step) => (
               <div
-                key={idx}
-                className={`relative p-4 rounded-xl border ${
+                key={step.step}
+                className={`relative p-4 rounded-xl border transition-all ${
                   step.isCancelled
-                    ? "bg-rose-950/20 border-rose-500/30 text-rose-200"
+                    ? "bg-rose-50/60 border-rose-200 text-rose-900"
                     : step.completed
-                    ? "bg-emerald-950/20 border-emerald-500/30 text-emerald-200"
+                    ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
                     : step.current
-                    ? "bg-amber-950/20 border-amber-500/40 text-amber-200"
-                    : "bg-zinc-900/40 border-zinc-800/60 text-zinc-500"
+                    ? "bg-amber-50 border-amber-300 text-amber-950 ring-2 ring-amber-400/20"
+                    : "bg-zinc-50/80 border-zinc-200 text-zinc-500"
                 }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider">
-                    Step 0{idx + 1}
+                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-500">
+                    Step 0{step.step}
                   </span>
                   {step.isCancelled ? (
-                    <XCircle className="w-4 h-4 text-rose-400" />
+                    <XCircle className="w-4 h-4 text-rose-600" />
                   ) : step.completed ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                   ) : step.current ? (
-                    <Clock className="w-4 h-4 text-amber-400 animate-pulse" />
+                    <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
                   ) : (
-                    <div className="w-3.5 h-3.5 rounded-full border border-zinc-700" />
+                    <div className="w-3.5 h-3.5 rounded-full border border-zinc-300" />
                   )}
                 </div>
-                <div className="font-semibold text-sm text-zinc-200">{step.title}</div>
-                <div className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                <div className="font-bold text-sm text-zinc-900">{step.title}</div>
+                <div className="text-xs text-zinc-600 mt-1 leading-relaxed">
                   {step.description}
                 </div>
                 {step.date && (
                   <div className="text-[11px] font-mono text-zinc-500 mt-2 flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
+                    <Calendar className="w-3 h-3 text-zinc-400" />
                     {new Date(step.date).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
@@ -623,24 +711,24 @@ export function OrderDetailView({
           {/* Left: Ordered Items & Vault Disclosures (2 cols) */}
           <div className="lg:col-span-2 space-y-6">
             {/* Items Card */}
-            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl overflow-hidden">
-              <div className="p-5 border-b border-zinc-800 flex items-center justify-between">
+            <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-xs">
+              <div className="p-5 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/60">
                 <div className="flex items-center gap-2">
-                  <Package className="w-4 h-4 text-amber-400" />
-                  <h2 className="text-sm font-semibold text-zinc-200">
+                  <Package className="w-4 h-4 text-amber-500" />
+                  <h2 className="text-sm font-bold text-zinc-900">
                     Order Items ({order.items.length})
                   </h2>
                 </div>
-                <span className="text-xs text-zinc-400">
-                  {order.items.reduce((acc, i) => acc + i.quantity, 0)} total units
+                <span className="text-xs text-zinc-500">
+                  {order.items.reduce((acc, i) => acc + i.quantity, 0)} total unit(s)
                 </span>
               </div>
 
-              <div className="divide-y divide-zinc-800/60">
+              <div className="divide-y divide-zinc-100">
                 {order.items.map((item) => (
-                  <div key={item.id} className="p-5 flex gap-4 items-start hover:bg-zinc-850/20 transition">
+                  <div key={item.id} className="p-5 flex gap-4 items-start hover:bg-zinc-50/50 transition">
                     {/* Thumbnail */}
-                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-zinc-950 border border-zinc-800 overflow-hidden shrink-0">
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl bg-zinc-100 border border-zinc-200 overflow-hidden shrink-0">
                       {item.productImageUrl ? (
                         <Image
                           src={item.productImageUrl}
@@ -650,7 +738,7 @@ export function OrderDetailView({
                           sizes="80px"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-600">
+                        <div className="w-full h-full flex items-center justify-center text-zinc-400">
                           <Package className="w-6 h-6" />
                         </div>
                       )}
@@ -660,17 +748,17 @@ export function OrderDetailView({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h3 className="font-semibold text-sm text-zinc-100 hover:text-amber-400 transition">
+                          <h3 className="font-bold text-sm text-zinc-900 hover:text-amber-600 transition">
                             {item.productTitle}
                           </h3>
                           <div className="flex flex-wrap items-center gap-2 mt-1">
                             {item.variantDetails && (
-                              <span className="text-[11px] text-zinc-300 bg-zinc-800/60 px-2 py-0.5 rounded border border-zinc-700/50">
+                              <span className="text-[11px] text-zinc-700 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200 font-medium">
                                 {item.variantDetails}
                               </span>
                             )}
                             {item.variant?.condition && (
-                              <span className="text-[11px] text-zinc-400">
+                              <span className="text-[11px] text-zinc-500">
                                 Condition: {item.variant.condition}
                               </span>
                             )}
@@ -679,10 +767,10 @@ export function OrderDetailView({
 
                         {/* Price Breakdown */}
                         <div className="text-right shrink-0">
-                          <div className="font-mono font-semibold text-sm text-zinc-100">
+                          <div className="font-mono font-bold text-sm text-zinc-900">
                             {formatPrice(item.subtotal, storeConfig.currencySymbol)}
                           </div>
-                          <div className="text-xs text-zinc-400 font-mono mt-0.5">
+                          <div className="text-xs text-zinc-500 font-mono mt-0.5">
                             {item.quantity} × {formatPrice(item.unitPrice, storeConfig.currencySymbol)}
                           </div>
                         </div>
@@ -690,10 +778,10 @@ export function OrderDetailView({
 
                       {/* 1-of-1 Vault Disclosure */}
                       {item.variant?.isOneOfOne && (
-                        <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px]">
-                          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                          <span className="font-semibold">Vault Certified 1-of-1:</span>
-                          <span className="text-amber-400/80">
+                        <div className="mt-2.5 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-[11px]">
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                          <span className="font-bold">Vault Certified 1-of-1:</span>
+                          <span className="text-amber-800">
                             Single-specimen artifact locked and serialized in vault.
                           </span>
                         </div>
@@ -704,24 +792,24 @@ export function OrderDetailView({
               </div>
 
               {/* Order Financial Totals */}
-              <div className="p-5 bg-zinc-950/40 border-t border-zinc-800 space-y-2">
-                <div className="flex justify-between text-xs text-zinc-400">
+              <div className="p-5 bg-zinc-50/80 border-t border-zinc-200 space-y-2">
+                <div className="flex justify-between text-xs text-zinc-600">
                   <span>Subtotal</span>
-                  <span className="font-mono text-zinc-300">
+                  <span className="font-mono text-zinc-900 font-medium">
                     {formatPrice(order.subtotal, storeConfig.currencySymbol)}
                   </span>
                 </div>
-                <div className="flex justify-between text-xs text-zinc-400">
+                <div className="flex justify-between text-xs text-zinc-600">
                   <span>Shipping Fee</span>
-                  <span className="font-mono text-zinc-300">
+                  <span className="font-mono text-zinc-900 font-medium">
                     {order.shippingFee === 0
                       ? "FREE"
                       : formatPrice(order.shippingFee, storeConfig.currencySymbol)}
                   </span>
                 </div>
-                <div className="flex justify-between text-sm font-semibold text-zinc-100 pt-2 border-t border-zinc-800/80">
+                <div className="flex justify-between text-sm font-bold text-zinc-900 pt-2 border-t border-zinc-200">
                   <span>Grand Total</span>
-                  <span className="font-mono text-amber-400 text-base">
+                  <span className="font-mono text-amber-700 text-base font-black">
                     {formatPrice(order.totalAmount, storeConfig.currencySymbol)}
                   </span>
                 </div>
@@ -729,31 +817,31 @@ export function OrderDetailView({
             </div>
 
             {/* Courier Tracking Dispatch Card */}
-            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5">
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-indigo-400" />
-                  <h2 className="text-sm font-semibold text-zinc-200">
+                  <Truck className="w-4 h-4 text-indigo-600" />
+                  <h2 className="text-sm font-bold text-zinc-900">
                     Courier Dispatch & Waybill
                   </h2>
                 </div>
                 <button
                   onClick={() => setIsTrackingModalOpen(true)}
-                  className="text-xs text-indigo-400 hover:text-indigo-300 underline"
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold underline"
                 >
                   Edit Courier Details
                 </button>
               </div>
 
               {order.shippingCarrier && order.trackingNumber ? (
-                <div className="bg-zinc-950/60 border border-zinc-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <div className="text-xs text-zinc-400">Designated Carrier</div>
-                    <div className="font-semibold text-sm text-zinc-100">
+                    <div className="text-xs text-zinc-500">Designated Carrier</div>
+                    <div className="font-bold text-sm text-zinc-900">
                       {order.shippingCarrier}
                     </div>
-                    <div className="font-mono text-xs text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded border border-indigo-500/20 inline-block mt-1">
-                      Tracking: {order.trackingNumber}
+                    <div className="font-mono text-xs text-indigo-800 bg-white px-2.5 py-1 rounded border border-indigo-200 inline-block mt-1 font-semibold">
+                      Tracking #: {order.trackingNumber}
                     </div>
                   </div>
 
@@ -763,26 +851,26 @@ export function OrderDetailView({
                         href={trackingUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 text-white hover:bg-indigo-500 transition"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 shadow-xs transition"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                         Track with Carrier
                       </a>
                     ) : (
                       <span className="text-xs text-zinc-500">
-                        Carrier portal link available on tracking code
+                        Carrier portal link available with waybill
                       </span>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="bg-zinc-950/40 border border-dashed border-zinc-800 rounded-xl p-6 text-center">
-                  <p className="text-xs text-zinc-400 mb-3">
+                <div className="bg-zinc-50 border border-dashed border-zinc-300 rounded-xl p-6 text-center">
+                  <p className="text-xs text-zinc-500 mb-3">
                     No courier has been assigned to this order yet.
                   </p>
                   <button
                     onClick={() => setIsTrackingModalOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/20 transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100 transition"
                   >
                     <Truck className="w-3.5 h-3.5" />
                     Assign Courier & Waybill
@@ -793,26 +881,26 @@ export function OrderDetailView({
 
             {/* Audit Trail for Order */}
             {auditLogs.length > 0 && (
-              <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5">
+              <div className="bg-white border border-zinc-200 rounded-2xl p-5 shadow-xs">
                 <div className="flex items-center gap-2 mb-4">
-                  <History className="w-4 h-4 text-zinc-400" />
-                  <h2 className="text-sm font-semibold text-zinc-200">
-                    Order Audit Log History
+                  <History className="w-4 h-4 text-zinc-500" />
+                  <h2 className="text-sm font-bold text-zinc-900">
+                    Order Audit Trail
                   </h2>
                 </div>
                 <div className="space-y-2">
                   {auditLogs.map((log) => (
                     <div
                       key={log.id}
-                      className="text-xs bg-zinc-950/40 border border-zinc-800/60 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1"
+                      className="text-xs bg-zinc-50 border border-zinc-200 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1"
                     >
                       <div>
-                        <span className="font-mono font-medium text-amber-400">
+                        <span className="font-mono font-bold text-amber-700">
                           {log.action}
                         </span>{" "}
-                        <span className="text-zinc-400">by {log.userEmail}</span>
+                        <span className="text-zinc-600">by {log.userEmail}</span>
                       </div>
-                      <span className="text-[11px] text-zinc-500 font-mono">
+                      <span className="text-[11px] text-zinc-400 font-mono">
                         {new Date(log.createdAt).toLocaleString()}
                       </span>
                     </div>
@@ -825,16 +913,16 @@ export function OrderDetailView({
           {/* Right: Buyer & Shipping Address & Payment Card (1 col) */}
           <div className="space-y-6">
             {/* Buyer Contact Card */}
-            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-zinc-800">
-                <User className="w-4 h-4 text-amber-400" />
-                <h2 className="text-sm font-semibold text-zinc-200">Buyer Information</h2>
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 space-y-4 shadow-xs">
+              <div className="flex items-center gap-2 pb-3 border-b border-zinc-200">
+                <User className="w-4 h-4 text-amber-500" />
+                <h2 className="text-sm font-bold text-zinc-900">Buyer Information</h2>
               </div>
 
               <div className="space-y-2 text-xs">
                 <div>
                   <span className="text-zinc-500 block">Customer Name</span>
-                  <span className="font-semibold text-zinc-200 text-sm">
+                  <span className="font-bold text-zinc-900 text-sm">
                     {order.customerName}
                   </span>
                 </div>
@@ -843,7 +931,7 @@ export function OrderDetailView({
                   <span className="text-zinc-500 block">Email Address</span>
                   <a
                     href={`mailto:${order.customerEmail}`}
-                    className="text-amber-400 hover:underline"
+                    className="text-amber-700 hover:underline font-medium"
                   >
                     {order.customerEmail}
                   </a>
@@ -852,17 +940,17 @@ export function OrderDetailView({
                 {order.customerPhone && (
                   <div>
                     <span className="text-zinc-500 block">Phone</span>
-                    <span className="text-zinc-300">{order.customerPhone}</span>
+                    <span className="text-zinc-700 font-medium">{order.customerPhone}</span>
                   </div>
                 )}
 
-                <div className="pt-2 border-t border-zinc-800/80">
+                <div className="pt-2 border-t border-zinc-100">
                   <span className="text-zinc-500 block">Account Status</span>
                   <span
-                    className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[11px] font-medium ${
+                    className={`inline-block mt-0.5 px-2 py-0.5 rounded text-[11px] font-semibold ${
                       order.userId
-                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                        : "bg-zinc-800 text-zinc-400"
+                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                        : "bg-zinc-100 text-zinc-600"
                     }`}
                   >
                     {order.userId ? "Registered Collector" : "Guest Checkout"}
@@ -872,53 +960,80 @@ export function OrderDetailView({
             </div>
 
             {/* Shipping Address Card */}
-            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-zinc-800">
-                <MapPin className="w-4 h-4 text-emerald-400" />
-                <h2 className="text-sm font-semibold text-zinc-200">Delivery Address</h2>
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 space-y-4 shadow-xs">
+              <div className="flex items-center gap-2 pb-3 border-b border-zinc-200">
+                <MapPin className="w-4 h-4 text-emerald-600" />
+                <h2 className="text-sm font-bold text-zinc-900">Delivery Address</h2>
               </div>
 
-              <div className="text-xs text-zinc-300 space-y-1">
-                <div className="font-semibold text-sm text-zinc-100">
+              <div className="text-xs text-zinc-700 space-y-1">
+                <div className="font-bold text-sm text-zinc-900">
                   {order.shippingAddress.fullName}
                 </div>
-                <div className="text-zinc-400">{order.shippingAddress.phone}</div>
-                <div className="pt-2 text-zinc-300">{order.shippingAddress.street}</div>
+                <div className="text-zinc-500">{order.shippingAddress.phone}</div>
+                <div className="pt-2 text-zinc-800">{order.shippingAddress.street}</div>
                 {order.shippingAddress.apartment && (
-                  <div className="text-zinc-400">{order.shippingAddress.apartment}</div>
+                  <div className="text-zinc-600">{order.shippingAddress.apartment}</div>
                 )}
                 <div>
                   {order.shippingAddress.city}, {order.shippingAddress.province}{" "}
                   {order.shippingAddress.postalCode}
                 </div>
-                <div className="text-zinc-400">{order.shippingAddress.country}</div>
+                <div className="text-zinc-500">{order.shippingAddress.country}</div>
               </div>
             </div>
 
             {/* Payment Details Card */}
-            <div className="bg-zinc-900/60 border border-zinc-800/80 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center gap-2 pb-3 border-b border-zinc-800">
-                <CreditCard className="w-4 h-4 text-blue-400" />
-                <h2 className="text-sm font-semibold text-zinc-200">Payment Status</h2>
+            <div className="bg-white border border-zinc-200 rounded-2xl p-5 space-y-4 shadow-xs">
+              <div className="flex items-center gap-2 pb-3 border-b border-zinc-200">
+                <CreditCard className="w-4 h-4 text-blue-600" />
+                <h2 className="text-sm font-bold text-zinc-900">Payment Status</h2>
               </div>
 
               <div className="space-y-3 text-xs">
+                {order.isSimulated && (
+                  <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50 text-purple-900 space-y-0.5">
+                    <span className="font-bold text-[11px] uppercase tracking-wider block">
+                      Demo Payment Mode
+                    </span>
+                    <span className="text-[11px] text-purple-800 leading-relaxed block">
+                      This order was settled using demo checkout and is isolated from real store revenue.
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500">Method</span>
-                  <span className="font-mono font-medium text-zinc-200">
-                    {order.paymentMethod}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono font-bold text-zinc-900">
+                      {order.paymentMethod}
+                    </span>
+                    {order.isSimulated && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 border border-purple-200 font-bold">
+                        DEMO
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {order.paymentReference && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-zinc-500">Reference ID</span>
+                    <span className="font-mono text-zinc-800 text-[11px] truncate max-w-[180px]">
+                      {order.paymentReference}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex justify-between items-center">
                   <span className="text-zinc-500">Status</span>
                   <span
-                    className={`px-2 py-0.5 rounded-full text-[11px] font-medium border ${
+                    className={`px-2 py-0.5 rounded-full text-[11px] font-bold border ${
                       order.paymentStatus === "PAID"
-                        ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                        ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                         : order.paymentStatus === "FAILED"
-                        ? "bg-rose-500/10 text-rose-400 border-rose-500/20"
-                        : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                        ? "bg-rose-50 text-rose-800 border-rose-200"
+                        : "bg-amber-50 text-amber-800 border-amber-200"
                     }`}
                   >
                     {order.paymentStatus}
@@ -926,10 +1041,10 @@ export function OrderDetailView({
                 </div>
 
                 {order.paidAt && (
-                  <div className="flex justify-between items-center pt-2 border-t border-zinc-800/80">
+                  <div className="flex justify-between items-center pt-2 border-t border-zinc-100">
                     <span className="text-zinc-500">Settled On</span>
-                    <span className="text-zinc-300">
-                      {new Date(order.paidAt).toLocaleDateString()}
+                    <span className="text-zinc-800 font-mono text-[11px]">
+                      {new Date(order.paidAt).toLocaleDateString()} {new Date(order.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 )}
@@ -941,21 +1056,21 @@ export function OrderDetailView({
 
       {/* ── MODAL: UPDATE STATUS ────────────────────────────────────────── */}
       {isStatusModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white">Update Order Status</h3>
-            <p className="text-xs text-zinc-400">
-              Moving order to <strong>SHIPPED</strong> records the shipping timestamp.
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white border border-zinc-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl text-zinc-900">
+            <h3 className="text-lg font-bold text-zinc-900">Update Order Status</h3>
+            <p className="text-xs text-zinc-500">
+              Moving order to <strong>SHIPPED</strong> records the dispatched timestamp.
               Moving to <strong>DELIVERED</strong> completes the order and reconciles COD payment.
             </p>
 
             <form onSubmit={handleStatusUpdate} className="space-y-4 pt-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-300">Select Status</label>
+                <label className="text-xs font-semibold text-zinc-700">Select Target Status</label>
                 <select
                   value={newStatus}
                   onChange={(e) => setNewStatus(e.target.value as ValidAdminTargetStatus)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-amber-400"
+                  className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-amber-500"
                 >
                   <option value="PENDING">PENDING</option>
                   <option value="PROCESSING">PROCESSING</option>
@@ -971,14 +1086,14 @@ export function OrderDetailView({
                   type="button"
                   onClick={() => setIsStatusModalOpen(false)}
                   disabled={isUpdatingStatus}
-                  className="px-4 py-2 text-xs rounded-xl bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                  className="px-4 py-2 text-xs rounded-xl bg-zinc-100 text-zinc-700 hover:bg-zinc-200 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdatingStatus}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-amber-500 text-zinc-950 hover:bg-amber-400 flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-500 text-black hover:bg-amber-400 flex items-center gap-1.5 shadow-xs"
                 >
                   {isUpdatingStatus && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Save Status
@@ -991,20 +1106,20 @@ export function OrderDetailView({
 
       {/* ── MODAL: ASSIGN TRACKING ──────────────────────────────────────── */}
       {isTrackingModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 space-y-4">
-            <h3 className="text-lg font-bold text-white">Assign Courier & Tracking</h3>
-            <p className="text-xs text-zinc-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white border border-zinc-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl text-zinc-900">
+            <h3 className="text-lg font-bold text-zinc-900">Assign Courier & Waybill</h3>
+            <p className="text-xs text-zinc-500">
               Tracking numbers are visible to customers on their order tracking timeline.
             </p>
 
             <form onSubmit={handleTrackingUpdate} className="space-y-4 pt-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-300">Courier Carrier</label>
+                <label className="text-xs font-semibold text-zinc-700">Courier Carrier</label>
                 <select
                   value={carrier}
                   onChange={(e) => setCarrier(e.target.value)}
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-amber-400"
+                  className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-amber-500"
                 >
                   {CARRIER_OPTIONS.map((c) => (
                     <option key={c} value={c}>
@@ -1015,13 +1130,13 @@ export function OrderDetailView({
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-300">Waybill / Tracking Number</label>
+                <label className="text-xs font-semibold text-zinc-700">Waybill / Tracking Number</label>
                 <input
                   type="text"
                   value={trackingNumber}
                   onChange={(e) => setTrackingNumber(e.target.value)}
                   placeholder="e.g. 1729-4820-XXXX"
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-200 font-mono focus:outline-none focus:border-amber-400"
+                  className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-sm text-zinc-900 font-mono focus:outline-none focus:border-amber-500"
                   required
                 />
               </div>
@@ -1032,10 +1147,10 @@ export function OrderDetailView({
                   id="markShippedCheck"
                   checked={markShippedOnTracking}
                   onChange={(e) => setMarkShippedOnTracking(e.target.checked)}
-                  className="rounded border-zinc-800 bg-zinc-950 text-indigo-600 focus:ring-0 w-4 h-4"
+                  className="rounded border-zinc-300 bg-white text-indigo-600 focus:ring-0 w-4 h-4"
                 />
-                <label htmlFor="markShippedCheck" className="text-xs text-zinc-300 cursor-pointer">
-                  Automatically mark order as <strong>SHIPPED</strong> now
+                <label htmlFor="markShippedCheck" className="text-xs text-zinc-700 cursor-pointer font-medium">
+                  Automatically mark order as <strong>DISPATCHED (SHIPPED)</strong> now
                 </label>
               </div>
 
@@ -1044,14 +1159,14 @@ export function OrderDetailView({
                   type="button"
                   onClick={() => setIsTrackingModalOpen(false)}
                   disabled={isUpdatingTracking}
-                  className="px-4 py-2 text-xs rounded-xl bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                  className="px-4 py-2 text-xs rounded-xl bg-zinc-100 text-zinc-700 hover:bg-zinc-200 font-semibold"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isUpdatingTracking}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 flex items-center gap-1.5 shadow-xs"
                 >
                   {isUpdatingTracking && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Save Tracking
@@ -1064,26 +1179,26 @@ export function OrderDetailView({
 
       {/* ── MODAL: CANCEL ORDER ─────────────────────────────────────────── */}
       {isCancelModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-zinc-900 border border-rose-500/30 rounded-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center gap-2 text-rose-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="bg-white border border-rose-200 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl text-zinc-900">
+            <div className="flex items-center gap-2 text-rose-600">
               <AlertTriangle className="w-5 h-5" />
               <h3 className="text-lg font-bold">Cancel Order & Restore Inventory</h3>
             </div>
-            <p className="text-xs text-zinc-300 leading-relaxed">
+            <p className="text-xs text-zinc-600 leading-relaxed">
               Cancelling will mark this order as <strong>CANCELLED</strong>, restore quantities to
               product inventory, and release 1-of-1 Vault items back to available status.
             </p>
 
             <form onSubmit={handleCancelOrder} className="space-y-4 pt-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-zinc-300">Cancellation Reason</label>
+                <label className="text-xs font-semibold text-zinc-700">Cancellation Reason</label>
                 <input
                   type="text"
                   value={cancelReason}
                   onChange={(e) => setCancelReason(e.target.value)}
-                  placeholder="Provide reason for audit log..."
-                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-zinc-200 focus:outline-none focus:border-rose-400"
+                  placeholder="Provide reason for audit trail..."
+                  className="w-full bg-white border border-zinc-300 rounded-xl px-3 py-2 text-sm text-zinc-900 focus:outline-none focus:border-rose-500"
                   required
                 />
               </div>
@@ -1093,14 +1208,14 @@ export function OrderDetailView({
                   type="button"
                   onClick={() => setIsCancelModalOpen(false)}
                   disabled={isCancelling}
-                  className="px-4 py-2 text-xs rounded-xl bg-zinc-800 text-zinc-300 hover:bg-zinc-700"
+                  className="px-4 py-2 text-xs rounded-xl bg-zinc-100 text-zinc-700 hover:bg-zinc-200 font-semibold"
                 >
                   Keep Order Active
                 </button>
                 <button
                   type="submit"
                   disabled={isCancelling}
-                  className="px-4 py-2 text-xs font-semibold rounded-xl bg-rose-600 text-white hover:bg-rose-500 flex items-center gap-1.5"
+                  className="px-4 py-2 text-xs font-bold rounded-xl bg-rose-600 text-white hover:bg-rose-700 flex items-center gap-1.5 shadow-xs"
                 >
                   {isCancelling && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Confirm Cancellation

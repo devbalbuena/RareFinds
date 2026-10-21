@@ -139,13 +139,13 @@ export function OrderManagementTable({
 
   // Debounced search trigger
   React.useEffect(() => {
-    const handler = setTimeout(() => {
+    const timer = setTimeout(() => {
       fetchOrders(1);
     }, 300);
-    return () => clearTimeout(handler);
+    return () => clearTimeout(timer);
   }, [searchQuery, statusFilter, paymentMethodFilter, paymentStatusFilter, sortBy, fetchOrders]);
 
-  // Submit tracking details
+  // Handle Save Tracking
   const handleSaveTracking = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!trackingModalOrder) return;
@@ -156,6 +156,7 @@ export function OrderManagementTable({
 
     setTrackingLoading(true);
     setNotice(null);
+
     try {
       const res = await updateOrderTrackingAction({
         orderId: trackingModalOrder.id,
@@ -169,83 +170,80 @@ export function OrderManagementTable({
       } else {
         setNotice({
           type: "success",
-          message: `Order ${trackingModalOrder.orderNumber} updated with tracking: ${trackingNumberInput.trim()} (${carrierInput})`,
+          message: `Order #${trackingModalOrder.orderNumber} dispatched via ${carrierInput} (Waybill: ${trackingNumberInput.trim()}).`,
         });
         setTrackingModalOrder(null);
-        setTrackingNumberInput("");
         fetchOrders(currentPage);
       }
-    } catch {
-      setNotice({ type: "error", message: "Failed to update tracking details." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save tracking.";
+      setNotice({ type: "error", message: msg });
     } finally {
       setTrackingLoading(false);
     }
   };
 
-  // Submit status update
+  // Handle Status Transition
   const handleUpdateStatus = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!statusModalOrder || !selectedNewStatus) return;
 
     setStatusUpdateLoading(true);
     setNotice(null);
+
     try {
       const res = await updateOrderStatusAction({
         orderId: statusModalOrder.id,
-        status: selectedNewStatus as
-          | "PENDING"
-          | "PROCESSING"
-          | "PAID"
-          | "SHIPPED"
-          | "DELIVERED"
-          | "CANCELLED",
+        status: selectedNewStatus as "PENDING" | "PROCESSING" | "PAID" | "SHIPPED" | "DELIVERED" | "CANCELLED",
         notes: statusNotesInput.trim() || undefined,
       });
 
       if (res.error) {
         setNotice({ type: "error", message: res.error });
       } else {
+        const extraNote = selectedNewStatus === "DELIVERED" ? " Delivery timestamp recorded and COD reconciled." : "";
         setNotice({
           type: "success",
-          message: `Order ${statusModalOrder.orderNumber} transitioned to ${selectedNewStatus}.`,
+          message: `Order #${statusModalOrder.orderNumber} status changed to ${selectedNewStatus}.${extraNote}`,
         });
         setStatusModalOrder(null);
-        setStatusNotesInput("");
         fetchOrders(currentPage);
       }
-    } catch {
-      setNotice({ type: "error", message: "Failed to update status." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update order status.";
+      setNotice({ type: "error", message: msg });
     } finally {
       setStatusUpdateLoading(false);
     }
   };
 
-  // Submit order cancellation
+  // Handle Order Cancellation
   const handleCancelOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cancelModalOrder) return;
-    if (!cancelReasonInput.trim()) {
-      setNotice({ type: "error", message: "Please specify a cancellation reason." });
-      return;
-    }
 
     setCancelLoading(true);
     setNotice(null);
+
     try {
-      const res = await cancelOrderAdminAction(cancelModalOrder.id, cancelReasonInput.trim());
+      const res = await cancelOrderAdminAction(
+        cancelModalOrder.id,
+        cancelReasonInput.trim() || "Staff manually initiated cancellation from fulfillment dashboard."
+      );
+
       if (res.error) {
         setNotice({ type: "error", message: res.error });
       } else {
         setNotice({
           type: "success",
-          message: `Order ${cancelModalOrder.orderNumber} cancelled. 1-of-1 sneakers and inventory released.`,
+          message: `Order #${cancelModalOrder.orderNumber} has been CANCELLED and items restored to inventory.`,
         });
         setCancelModalOrder(null);
-        setCancelReasonInput("");
         fetchOrders(currentPage);
       }
-    } catch {
-      setNotice({ type: "error", message: "Failed to cancel order." });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to cancel order.";
+      setNotice({ type: "error", message: msg });
     } finally {
       setCancelLoading(false);
     }
@@ -255,50 +253,50 @@ export function OrderManagementTable({
     switch (status) {
       case "PENDING":
         return (
-          <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px] font-semibold gap-1">
-            <Clock className="h-3 w-3" /> PENDING
+          <Badge className="bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-bold gap-1">
+            <Clock className="h-3 w-3 text-amber-600" /> PENDING
           </Badge>
         );
       case "PENDING_PAYMENT":
         return (
-          <Badge className="bg-orange-500/10 text-orange-400 border-orange-500/20 text-[10px] font-semibold gap-1">
-            <Clock className="h-3 w-3" /> UNPAID HOLD
+          <Badge className="bg-orange-50 text-orange-800 border-orange-200 text-[10px] font-bold gap-1">
+            <Clock className="h-3 w-3 text-orange-600" /> UNPAID HOLD
           </Badge>
         );
       case "PROCESSING":
         return (
-          <Badge className="bg-blue-500/10 text-blue-400 border-blue-500/20 text-[10px] font-semibold gap-1">
-            <PackageCheck className="h-3 w-3" /> PROCESSING
+          <Badge className="bg-blue-50 text-blue-800 border-blue-200 text-[10px] font-bold gap-1">
+            <PackageCheck className="h-3 w-3 text-blue-600" /> PROCESSING
           </Badge>
         );
       case "PAID":
         return (
-          <Badge className="bg-indigo-500/10 text-indigo-400 border-indigo-500/20 text-[10px] font-semibold gap-1">
-            <CreditCard className="h-3 w-3" /> PAID
+          <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold gap-1">
+            <CreditCard className="h-3 w-3 text-emerald-600" /> PAID
           </Badge>
         );
       case "SHIPPED":
         return (
-          <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20 text-[10px] font-semibold gap-1">
-            <Truck className="h-3 w-3" /> SHIPPED
+          <Badge className="bg-purple-50 text-purple-800 border-purple-200 text-[10px] font-bold gap-1">
+            <Truck className="h-3 w-3 text-purple-600" /> DISPATCHED
           </Badge>
         );
       case "DELIVERED":
         return (
-          <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px] font-semibold gap-1">
-            <CheckCircle2 className="h-3 w-3" /> DELIVERED
+          <Badge className="bg-emerald-50 text-emerald-800 border-emerald-300 text-[10px] font-bold gap-1">
+            <CheckCircle2 className="h-3 w-3 text-emerald-600" /> DELIVERED
           </Badge>
         );
       case "CANCELLED":
         return (
-          <Badge className="bg-rose-500/10 text-rose-400 border-rose-500/20 text-[10px] font-semibold gap-1">
-            <XCircle className="h-3 w-3" /> CANCELLED
+          <Badge className="bg-zinc-100 text-zinc-600 border-zinc-200 text-[10px] font-bold gap-1">
+            <XCircle className="h-3 w-3 text-zinc-500" /> CANCELLED
           </Badge>
         );
       case "EXPIRED":
         return (
-          <Badge className="bg-zinc-800 text-zinc-400 border-zinc-700 text-[10px] font-semibold gap-1">
-            <Clock className="h-3 w-3" /> EXPIRED
+          <Badge className="bg-red-50 text-red-700 border-red-200 text-[10px] font-bold gap-1">
+            <Clock className="h-3 w-3 text-red-600" /> EXPIRED
           </Badge>
         );
       default:
@@ -309,23 +307,23 @@ export function OrderManagementTable({
   const statusTabs: { label: string; value: OrderStatus | "ALL"; countKey: string }[] = [
     { label: "All Orders", value: "ALL", countKey: "ALL" },
     { label: "Pending", value: "PENDING", countKey: "PENDING" },
-    { label: "Processing", value: "PROCESSING", countKey: "PROCESSING" },
-    { label: "Shipped", value: "SHIPPED", countKey: "SHIPPED" },
+    { label: "Processing & QC", value: "PROCESSING", countKey: "PROCESSING" },
+    { label: "Dispatched", value: "SHIPPED", countKey: "SHIPPED" },
     { label: "Delivered", value: "DELIVERED", countKey: "DELIVERED" },
     { label: "Cancelled", value: "CANCELLED", countKey: "CANCELLED" },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-zinc-900">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-800 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-6">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
+          <h1 className="text-2xl font-black uppercase tracking-tight text-zinc-900 flex items-center gap-2.5">
             <ShoppingBag className="h-6 w-6 text-amber-500" />
-            <span>Orders & Fulfillment Center</span>
+            <span>Orders &amp; Fulfillment Center</span>
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Track customer orders, confirm COD dispatches, assign courier tracking numbers, and view delivery timelines.
+          <p className="text-xs text-zinc-500 mt-1">
+            Track customer orders, confirm COD allocations, assign courier waybills, and monitor the 4-step delivery lifecycle.
           </p>
         </div>
       </div>
@@ -333,21 +331,21 @@ export function OrderManagementTable({
       {/* Notice Banner */}
       {notice && (
         <div
-          className={`flex items-start gap-3 p-3.5 rounded-xl border text-xs ${
+          className={`flex items-start gap-3 p-3.5 rounded-xl border text-xs shadow-2xs ${
             notice.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-              : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border-rose-200 text-rose-800"
           }`}
         >
           {notice.type === "success" ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
           ) : (
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
           )}
           <div className="flex-1 font-medium leading-relaxed">{notice.message}</div>
           <button
             onClick={() => setNotice(null)}
-            className="text-zinc-500 hover:text-white transition-colors"
+            className="text-zinc-500 hover:text-zinc-900 transition-colors font-bold text-xs"
           >
             ✕
           </button>
@@ -355,7 +353,7 @@ export function OrderManagementTable({
       )}
 
       {/* Filter Tabs by Status */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-zinc-800/80">
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none border-b border-zinc-200">
         {statusTabs.map((tab) => {
           const isSelected = statusFilter === tab.value;
           const count = statusCounts[tab.countKey] || 0;
@@ -369,16 +367,16 @@ export function OrderManagementTable({
               }}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 ${
                 isSelected
-                  ? "bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20"
-                  : "bg-zinc-900/60 text-zinc-400 hover:text-white hover:bg-zinc-800 border border-zinc-800"
+                  ? "bg-amber-500 text-black shadow-xs"
+                  : "bg-white text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 border border-zinc-200 shadow-2xs"
               }`}
             >
               <span>{tab.label}</span>
               <span
-                className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold ${
                   isSelected
-                    ? "bg-zinc-950/20 text-zinc-950"
-                    : "bg-zinc-800 text-zinc-400"
+                    ? "bg-black/10 text-black"
+                    : "bg-zinc-100 text-zinc-500"
                 }`}
               >
                 {count}
@@ -391,12 +389,12 @@ export function OrderManagementTable({
       {/* Search and Secondary Filters Bar */}
       <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-zinc-500" />
+          <Search className="absolute left-3.5 top-2.5 h-4 w-4 text-zinc-400" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search order #, customer name, email, tracking..."
-            className="pl-9 h-10 bg-zinc-950 border-zinc-800 text-xs text-white placeholder:text-zinc-600 focus:border-amber-500"
+            className="pl-9 h-10 bg-white border-zinc-300 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-500 shadow-2xs"
           />
         </div>
 
@@ -408,11 +406,14 @@ export function OrderManagementTable({
               setPaymentMethodFilter(e.target.value as PaymentMethod | "ALL");
               setCurrentPage(1);
             }}
-            className="h-9 rounded-xl border border-zinc-800 bg-zinc-950 px-2.5 text-xs text-zinc-300 focus:outline-none focus:border-amber-500"
+            className="h-9 rounded-xl border border-zinc-300 bg-white px-2.5 text-xs text-zinc-700 focus:outline-none focus:border-amber-500 shadow-2xs font-medium"
           >
             <option value="ALL">All Payment Methods</option>
             <option value="COD">Cash on Delivery (COD)</option>
-            <option value="TEST">Test Online Payment</option>
+            <option value="GCASH">GCash (Demo)</option>
+            <option value="MAYA">Maya (Demo)</option>
+            <option value="CARD">Card (Demo)</option>
+            <option value="TEST">Test Simulation</option>
           </select>
 
           {/* Payment Status filter */}
@@ -422,7 +423,7 @@ export function OrderManagementTable({
               setPaymentStatusFilter(e.target.value as PaymentStatus | "ALL");
               setCurrentPage(1);
             }}
-            className="h-9 rounded-xl border border-zinc-800 bg-zinc-950 px-2.5 text-xs text-zinc-300 focus:outline-none focus:border-amber-500"
+            className="h-9 rounded-xl border border-zinc-300 bg-white px-2.5 text-xs text-zinc-700 focus:outline-none focus:border-amber-500 shadow-2xs font-medium"
           >
             <option value="ALL">All Payment Statuses</option>
             <option value="PAID">Paid</option>
@@ -437,7 +438,7 @@ export function OrderManagementTable({
               setSortBy(e.target.value as "newest" | "oldest" | "total_desc" | "total_asc");
               setCurrentPage(1);
             }}
-            className="h-9 rounded-xl border border-zinc-800 bg-zinc-950 px-2.5 text-xs text-zinc-300 focus:outline-none focus:border-amber-500"
+            className="h-9 rounded-xl border border-zinc-300 bg-white px-2.5 text-xs text-zinc-700 focus:outline-none focus:border-amber-500 shadow-2xs font-medium"
           >
             <option value="newest">Newest First</option>
             <option value="oldest">Oldest First</option>
@@ -448,21 +449,21 @@ export function OrderManagementTable({
       </div>
 
       {/* Orders Table */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden shadow-xl">
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-zinc-800 bg-zinc-950/70 text-zinc-400 uppercase tracking-wider text-[11px] font-semibold">
+            <thead className="border-b border-zinc-200 bg-zinc-50/80 text-zinc-600 uppercase tracking-wider text-[11px] font-bold">
               <tr>
-                <th className="py-3.5 px-4">Order # & Date</th>
+                <th className="py-3.5 px-4">Order # &amp; Date</th>
                 <th className="py-3.5 px-4">Customer</th>
                 <th className="py-3.5 px-4">Items</th>
                 <th className="py-3.5 px-4">Total Amount</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Courier & Tracking</th>
+                <th className="py-3.5 px-4">Courier &amp; Tracking</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y divide-zinc-100">
               {loading ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-zinc-500">
@@ -491,14 +492,14 @@ export function OrderManagementTable({
                   return (
                     <tr
                       key={order.id}
-                      className="hover:bg-zinc-800/30 transition-colors group"
+                      className="hover:bg-zinc-50/70 transition-colors group"
                     >
                       {/* Order Number & Timestamp */}
                       <td className="py-3.5 px-4 align-top">
                         <div className="space-y-0.5">
                           <Link
                             href={`/admin/orders/${order.id}`}
-                            className="font-bold text-white hover:text-amber-400 font-mono text-xs transition-colors block"
+                            className="font-bold text-zinc-900 hover:text-amber-600 font-mono text-xs transition-colors block"
                           >
                             {order.orderNumber}
                           </Link>
@@ -511,13 +512,13 @@ export function OrderManagementTable({
                       {/* Customer Details */}
                       <td className="py-3.5 px-4 align-top">
                         <div className="space-y-0.5 max-w-[180px]">
-                          <span className="font-semibold text-white block truncate">
+                          <span className="font-bold text-zinc-900 block truncate">
                             {order.customerName}
                           </span>
-                          <span className="text-[11px] text-zinc-400 block truncate">
+                          <span className="text-[11px] text-zinc-500 block truncate">
                             {order.customerEmail}
                           </span>
-                          <span className="text-[10px] text-zinc-500 block truncate">
+                          <span className="text-[10px] text-zinc-400 block truncate">
                             {order.shippingAddress?.city}, {order.shippingAddress?.province}
                           </span>
                         </div>
@@ -528,21 +529,21 @@ export function OrderManagementTable({
                         <div className="space-y-1.5 max-w-xs">
                           {order.items.map((item) => (
                             <div key={item.id} className="flex items-center gap-2">
-                              <div className="relative h-7 w-7 rounded-md bg-zinc-950 border border-zinc-800 overflow-hidden shrink-0">
+                              <div className="relative h-8 w-8 rounded-md bg-zinc-100 border border-zinc-200 overflow-hidden shrink-0">
                                 {item.productImageUrl ? (
                                   <Image
                                     src={item.productImageUrl}
                                     alt={item.productTitle}
                                     fill
-                                    sizes="28px"
+                                    sizes="32px"
                                     className="object-cover"
                                   />
                                 ) : (
-                                  <ShoppingBag className="h-3.5 w-3.5 text-zinc-600 m-auto" />
+                                  <ShoppingBag className="h-4 w-4 text-zinc-400 m-auto" />
                                 )}
                               </div>
                               <div className="truncate text-[11px]">
-                                <span className="font-medium text-zinc-200 block truncate">
+                                <span className="font-semibold text-zinc-900 block truncate">
                                   {item.productTitle}
                                 </span>
                                 <span className="text-[10px] text-zinc-500 block">
@@ -557,22 +558,27 @@ export function OrderManagementTable({
                       {/* Total Amount & Payment Mode */}
                       <td className="py-3.5 px-4 align-top">
                         <div className="space-y-1">
-                          <span className="font-black text-xs text-white block">
+                          <span className="font-black text-xs text-zinc-900 block">
                             {formatPrice(order.totalAmount)}
                           </span>
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <Badge
                               variant="outline"
-                              className="text-[9px] py-0 px-1 border-zinc-700 bg-zinc-950 text-zinc-400"
+                              className="text-[9px] py-0 px-1 border-zinc-200 bg-zinc-50 text-zinc-700 font-medium"
                             >
                               {order.paymentMethod}
                             </Badge>
+                            {order.isSimulated && (
+                              <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-[9px] py-0 px-1 font-bold uppercase">
+                                DEMO
+                              </Badge>
+                            )}
                             {order.paymentStatus === "PAID" ? (
-                              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] py-0 px-1 font-semibold">
+                              <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[9px] py-0 px-1 font-bold">
                                 PAID
                               </Badge>
                             ) : (
-                              <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] py-0 px-1 font-semibold">
+                              <Badge className="bg-amber-50 text-amber-800 border-amber-200 text-[9px] py-0 px-1 font-bold">
                                 UNPAID
                               </Badge>
                             )}
@@ -585,8 +591,13 @@ export function OrderManagementTable({
                         <div className="space-y-1">
                           {getStatusBadge(order.status)}
                           {order.shippedAt && (
-                            <span className="text-[10px] text-zinc-500 block">
+                            <span className="text-[10px] text-zinc-500 block font-mono">
                               Dispatched {new Date(order.shippedAt).toLocaleDateString("en-PH", { month: "short", day: "numeric" })}
+                            </span>
+                          )}
+                          {order.deliveredAt && (
+                            <span className="text-[10px] text-emerald-700 block font-mono font-medium">
+                              Delivered {new Date(order.deliveredAt).toLocaleDateString("en-PH", { month: "short", day: "numeric" })}
                             </span>
                           )}
                         </div>
@@ -596,10 +607,10 @@ export function OrderManagementTable({
                       <td className="py-3.5 px-4 align-top">
                         {order.trackingNumber ? (
                           <div className="space-y-0.5">
-                            <span className="font-bold text-white text-[11px] block">
+                            <span className="font-bold text-zinc-900 text-[11px] block">
                               {order.shippingCarrier || "Courier"}
                             </span>
-                            <span className="font-mono text-[10px] text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded inline-block">
+                            <span className="font-mono text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded inline-block font-semibold">
                               {order.trackingNumber}
                             </span>
                           </div>
@@ -611,7 +622,7 @@ export function OrderManagementTable({
                               setTrackingNumberInput("");
                               setMarkShippedCheck(true);
                             }}
-                            className="text-[11px] text-zinc-500 hover:text-amber-400 font-medium inline-flex items-center gap-1 transition-colors"
+                            className="text-[11px] text-zinc-500 hover:text-indigo-600 font-semibold inline-flex items-center gap-1 transition-colors"
                           >
                             <Truck className="h-3 w-3" /> Assign courier
                           </button>
@@ -631,8 +642,8 @@ export function OrderManagementTable({
                               setTrackingNumberInput(order.trackingNumber || "");
                               setMarkShippedCheck(order.status !== "SHIPPED" && order.status !== "DELIVERED");
                             }}
-                            title="Assign or update tracking"
-                            className="h-7 px-2 text-zinc-400 hover:text-amber-400 hover:bg-amber-500/10"
+                            title="Assign or update courier tracking"
+                            className="h-7 px-2 text-zinc-500 hover:text-indigo-600 hover:bg-indigo-50"
                           >
                             <Truck className="h-3.5 w-3.5" />
                           </Button>
@@ -647,7 +658,7 @@ export function OrderManagementTable({
                               setStatusNotesInput(order.notes || "");
                             }}
                             title="Update status"
-                            className="h-7 px-2 text-zinc-400 hover:text-blue-400 hover:bg-blue-500/10"
+                            className="h-7 px-2 text-zinc-500 hover:text-blue-600 hover:bg-blue-50"
                           >
                             <PackageCheck className="h-3.5 w-3.5" />
                           </Button>
@@ -658,9 +669,9 @@ export function OrderManagementTable({
                               variant="outline"
                               size="sm"
                               title="View order details and packing invoice"
-                              className="h-7 px-2.5 text-xs font-semibold gap-1 border-zinc-700 bg-zinc-900/60 hover:bg-zinc-800 text-white"
+                              className="h-7 px-2.5 text-xs font-bold gap-1 border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 shadow-2xs"
                             >
-                              <Eye className="h-3.5 w-3.5 text-zinc-400" />
+                              <Eye className="h-3.5 w-3.5 text-zinc-500" />
                               <span>View</span>
                             </Button>
                           </Link>
@@ -677,7 +688,7 @@ export function OrderManagementTable({
                                   setCancelReasonInput("");
                                 }}
                                 title="Cancel order and restock inventory"
-                                className="h-7 px-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10"
+                                className="h-7 px-2 text-zinc-500 hover:text-rose-600 hover:bg-rose-50"
                               >
                                 <Ban className="h-3.5 w-3.5" />
                               </Button>
@@ -694,10 +705,10 @@ export function OrderManagementTable({
 
         {/* Pagination Footer */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-zinc-800 bg-zinc-950/40 p-4 text-xs text-zinc-400">
+          <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50/60 p-4 text-xs text-zinc-600">
             <div>
-              Page <span className="font-semibold text-white">{currentPage}</span> of{" "}
-              <span className="font-semibold text-white">{totalPages}</span> ({totalCount} orders)
+              Page <span className="font-bold text-zinc-900">{currentPage}</span> of{" "}
+              <span className="font-bold text-zinc-900">{totalPages}</span> ({totalCount} orders)
             </div>
             <div className="flex items-center gap-2">
               <Button
@@ -705,7 +716,7 @@ export function OrderManagementTable({
                 size="sm"
                 disabled={currentPage <= 1 || loading}
                 onClick={() => fetchOrders(currentPage - 1)}
-                className="h-8 gap-1 text-xs border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white"
+                className="h-8 gap-1 text-xs border-zinc-200 bg-white text-zinc-700 hover:text-zinc-900 shadow-2xs"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
                 <span>Prev</span>
@@ -715,7 +726,7 @@ export function OrderManagementTable({
                 size="sm"
                 disabled={currentPage >= totalPages || loading}
                 onClick={() => fetchOrders(currentPage + 1)}
-                className="h-8 gap-1 text-xs border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white"
+                className="h-8 gap-1 text-xs border-zinc-200 bg-white text-zinc-700 hover:text-zinc-900 shadow-2xs"
               >
                 <span>Next</span>
                 <ChevronRight className="h-3.5 w-3.5" />
@@ -730,26 +741,26 @@ export function OrderManagementTable({
         open={!!trackingModalOrder}
         onOpenChange={(open) => !open && setTrackingModalOrder(null)}
       >
-        <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800 text-white">
+        <DialogContent className="sm:max-w-md bg-white border-zinc-200 text-zinc-900 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black uppercase tracking-tight flex items-center gap-2">
-              <Truck className="h-5 w-5 text-amber-500" />
-              <span>Courier & Tracking</span>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-zinc-900">
+              <Truck className="h-5 w-5 text-indigo-600" />
+              <span>Courier &amp; Waybill Tracking</span>
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-zinc-500">
               Assign shipping carrier and tracking code for Order #{trackingModalOrder?.orderNumber}.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSaveTracking} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block">
+              <label className="text-xs font-semibold text-zinc-700 block">
                 Shipping Carrier / Courier
               </label>
               <select
                 value={carrierInput}
                 onChange={(e) => setCarrierInput(e.target.value)}
-                className="w-full h-10 rounded-xl border border-zinc-800 bg-zinc-900 px-3 text-xs text-white focus:outline-none focus:border-amber-500"
+                className="w-full h-10 rounded-xl border border-zinc-300 bg-white px-3 text-xs text-zinc-900 focus:outline-none focus:border-amber-500"
               >
                 {COURIER_PRESETS.map((c) => (
                   <option key={c} value={c}>
@@ -761,28 +772,28 @@ export function OrderManagementTable({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block">
+              <label className="text-xs font-semibold text-zinc-700 block">
                 Tracking Waybill Number
               </label>
               <Input
                 value={trackingNumberInput}
                 onChange={(e) => setTrackingNumberInput(e.target.value)}
                 placeholder="e.g. 129038472910"
-                className="h-10 bg-zinc-900 border-zinc-800 text-xs font-mono text-white placeholder:text-zinc-600 focus:border-amber-500"
+                className="h-10 bg-white border-zinc-300 text-xs font-mono text-zinc-900 placeholder:text-zinc-400 focus:border-amber-500"
                 required
               />
             </div>
 
-            <div className="flex items-center gap-2 p-3 rounded-xl border border-zinc-800 bg-zinc-900/50">
+            <div className="flex items-center gap-2 p-3 rounded-xl border border-zinc-200 bg-zinc-50">
               <input
                 type="checkbox"
                 id="markShippedCheck"
                 checked={markShippedCheck}
                 onChange={(e) => setMarkShippedCheck(e.target.checked)}
-                className="h-4 w-4 rounded border-zinc-700 bg-zinc-900 text-amber-500 focus:ring-amber-500"
+                className="h-4 w-4 rounded border-zinc-300 bg-white text-indigo-600 focus:ring-indigo-500"
               />
-              <label htmlFor="markShippedCheck" className="text-xs text-zinc-300 font-medium cursor-pointer">
-                Automatically transition order status to <span className="font-bold text-amber-400">SHIPPED</span>
+              <label htmlFor="markShippedCheck" className="text-xs text-zinc-700 font-medium cursor-pointer">
+                Automatically transition order status to <span className="font-bold text-indigo-700">DISPATCHED (SHIPPED)</span>
               </label>
             </div>
 
@@ -792,7 +803,7 @@ export function OrderManagementTable({
                 variant="outline"
                 size="sm"
                 onClick={() => setTrackingModalOrder(null)}
-                className="border-zinc-800 bg-zinc-900 text-zinc-300"
+                className="border-zinc-200 bg-white text-zinc-700 font-semibold"
               >
                 Cancel
               </Button>
@@ -800,7 +811,7 @@ export function OrderManagementTable({
                 type="submit"
                 disabled={trackingLoading}
                 size="sm"
-                className="bg-amber-500 text-zinc-950 font-bold hover:bg-amber-400"
+                className="bg-indigo-600 text-white font-bold hover:bg-indigo-700"
               >
                 {trackingLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save Tracking"}
               </Button>
@@ -814,45 +825,46 @@ export function OrderManagementTable({
         open={!!statusModalOrder}
         onOpenChange={(open) => !open && setStatusModalOrder(null)}
       >
-        <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800 text-white">
+        <DialogContent className="sm:max-w-md bg-white border-zinc-200 text-zinc-900 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black uppercase tracking-tight flex items-center gap-2">
-              <PackageCheck className="h-5 w-5 text-blue-400" />
-              <span>Update Order Status</span>
+            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-zinc-900">
+              <PackageCheck className="h-5 w-5 text-blue-600" />
+              <span>Update Order Lifecycle Status</span>
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
-              Transition order status for Order #{statusModalOrder?.orderNumber}.
+            <DialogDescription className="text-xs text-zinc-500">
+              Transition fulfillment step for Order #{statusModalOrder?.orderNumber}.
+              Moving to <strong>DELIVERED</strong> will automatically record delivery time and reconcile COD.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleUpdateStatus} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block">
+              <label className="text-xs font-semibold text-zinc-700 block">
                 Target Status
               </label>
               <select
                 value={selectedNewStatus}
                 onChange={(e) => setSelectedNewStatus(e.target.value as OrderStatus)}
-                className="w-full h-10 rounded-xl border border-zinc-800 bg-zinc-900 px-3 text-xs text-white focus:outline-none focus:border-amber-500"
+                className="w-full h-10 rounded-xl border border-zinc-300 bg-white px-3 text-xs text-zinc-900 focus:outline-none focus:border-amber-500 font-medium"
                 required
               >
-                <option value="PENDING">PENDING (Awaiting confirmation)</option>
-                <option value="PROCESSING">PROCESSING (Packing in vault)</option>
-                <option value="PAID">PAID (Payment collected)</option>
-                <option value="SHIPPED">SHIPPED (Handed to courier)</option>
-                <option value="DELIVERED">DELIVERED (Successfully received)</option>
+                <option value="PENDING">PENDING (Step 1: Order received, awaiting confirmation)</option>
+                <option value="PROCESSING">PROCESSING (Step 2: Vault allocation &amp; QC)</option>
+                <option value="PAID">PAID (Payment settled)</option>
+                <option value="SHIPPED">SHIPPED (Step 3: Courier dispatched)</option>
+                <option value="DELIVERED">DELIVERED (Step 4: Package handed to recipient)</option>
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block">
-                Internal Note (Optional)
+              <label className="text-xs font-semibold text-zinc-700 block">
+                Internal Note / Courier POD (Optional)
               </label>
               <Input
                 value={statusNotesInput}
                 onChange={(e) => setStatusNotesInput(e.target.value)}
-                placeholder="e.g. Buyer verified via phone call"
-                className="h-10 bg-zinc-900 border-zinc-800 text-xs text-white placeholder:text-zinc-600 focus:border-amber-500"
+                placeholder="e.g. Courier confirmed delivery to recipient"
+                className="h-10 bg-white border-zinc-300 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-amber-500"
               />
             </div>
 
@@ -862,7 +874,7 @@ export function OrderManagementTable({
                 variant="outline"
                 size="sm"
                 onClick={() => setStatusModalOrder(null)}
-                className="border-zinc-800 bg-zinc-900 text-zinc-300"
+                className="border-zinc-200 bg-white text-zinc-700 font-semibold"
               >
                 Cancel
               </Button>
@@ -870,7 +882,7 @@ export function OrderManagementTable({
                 type="submit"
                 disabled={statusUpdateLoading}
                 size="sm"
-                className="bg-blue-500 text-white font-bold hover:bg-blue-400"
+                className="bg-blue-600 text-white font-bold hover:bg-blue-700"
               >
                 {statusUpdateLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Apply Status"}
               </Button>
@@ -884,27 +896,27 @@ export function OrderManagementTable({
         open={!!cancelModalOrder}
         onOpenChange={(open) => !open && setCancelModalOrder(null)}
       >
-        <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800 text-white">
+        <DialogContent className="sm:max-w-md bg-white border-rose-200 text-zinc-900 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-lg font-black uppercase tracking-tight flex items-center gap-2 text-rose-400">
+            <DialogTitle className="text-lg font-bold flex items-center gap-2 text-rose-600">
               <Ban className="h-5 w-5" />
-              <span>Cancel Order & Restock</span>
+              <span>Cancel Order &amp; Restock</span>
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-zinc-500">
               Cancelling Order #{cancelModalOrder?.orderNumber} will atomically restock all reserved sneakers and log a traceable stock adjustment.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCancelOrder} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 block">
+              <label className="text-xs font-semibold text-zinc-700 block">
                 Reason for Cancellation
               </label>
               <Input
                 value={cancelReasonInput}
                 onChange={(e) => setCancelReasonInput(e.target.value)}
                 placeholder="e.g. Buyer requested cancellation before dispatch"
-                className="h-10 bg-zinc-900 border-zinc-800 text-xs text-white placeholder:text-zinc-600 focus:border-rose-500"
+                className="h-10 bg-white border-zinc-300 text-xs text-zinc-900 placeholder:text-zinc-400 focus:border-rose-500"
                 required
               />
             </div>
@@ -915,7 +927,7 @@ export function OrderManagementTable({
                 variant="outline"
                 size="sm"
                 onClick={() => setCancelModalOrder(null)}
-                className="border-zinc-800 bg-zinc-900 text-zinc-300"
+                className="border-zinc-200 bg-white text-zinc-700 font-semibold"
               >
                 Keep Order
               </Button>
@@ -923,7 +935,7 @@ export function OrderManagementTable({
                 type="submit"
                 disabled={cancelLoading}
                 size="sm"
-                className="bg-rose-600 text-white font-bold hover:bg-rose-500"
+                className="bg-rose-600 text-white font-bold hover:bg-rose-700"
               >
                 {cancelLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Cancel & Restock"}
               </Button>
