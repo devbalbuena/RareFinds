@@ -62,18 +62,17 @@ export interface SerializedAdminProduct {
   id: string;
   title: string;
   slug: string;
-  description: string;
-  releaseYear: number | null;
-  colorway: string | null;
   sku: string | null;
-  rarity: string;
+  colorway: string | null;
   status: ProductStatus;
   isFeatured: boolean;
-  brand: { id: string; name: string };
-  category: { id: string; name: string };
-  images: SerializedProductImage[];
-  variants: SerializedProductVariant[];
+  rarity: string | null;
   createdAt: string;
+  updatedAt: string;
+  brand: { id: string; name: string; slug: string };
+  category: { id: string; name: string; slug: string };
+  variants: SerializedProductVariant[];
+  images: SerializedProductImage[];
 }
 
 interface ProductManagementTableProps {
@@ -99,43 +98,47 @@ export function ProductManagementTable({
 }: ProductManagementTableProps) {
   const isAdmin = userRole === Role.ADMIN;
 
-  // Filter & Search state
+  // Filter & Search states
   const [searchQuery, setSearchQuery] = React.useState(initialSearch);
   const [statusFilter, setStatusFilter] = React.useState<ProductStatus | "ALL">("ALL");
   const [brandFilter, setBrandFilter] = React.useState<string>("");
   const [categoryFilter, setCategoryFilter] = React.useState<string>("");
-  const [lowStockFilter, setLowStockFilter] = React.useState<boolean>(false);
-  const [soldFilter, setSoldFilter] = React.useState<boolean>(false);
+  const [lowStockFilter, setLowStockFilter] = React.useState(false);
+  const [soldFilter, setSoldFilter] = React.useState(false);
   const [sortBy, setSortBy] = React.useState<
     "newest" | "oldest" | "title_asc" | "title_desc" | "price_asc" | "price_desc"
   >("newest");
-  const [currentPage, setCurrentPage] = React.useState<number>(initialPage);
+  const [currentPage, setCurrentPage] = React.useState(initialPage);
 
-  // Data state
+  // Data states
   const [products, setProducts] = React.useState<SerializedAdminProduct[]>(initialProducts);
-  const [totalCount, setTotalCount] = React.useState<number>(initialTotal);
-  const [totalPages, setTotalPages] = React.useState<number>(initialTotalPages);
-  const [loading, setLoading] = React.useState<boolean>(false);
+  const [totalCount, setTotalCount] = React.useState(initialTotal);
+  const [totalPages, setTotalPages] = React.useState(initialTotalPages);
+  const [loading, setLoading] = React.useState(false);
 
-  // Stock modal state
-  const [stockModalProduct, setStockModalProduct] = React.useState<SerializedAdminProduct | null>(null);
-
-  // Delete modal state
-  const [deleteModalProduct, setDeleteModalProduct] = React.useState<SerializedAdminProduct | null>(null);
-  const [deleteLoading, setDeleteLoading] = React.useState<boolean>(false);
-
-  // Status banner state
+  // Action notices
   const [actionNotice, setActionNotice] = React.useState<{
     type: "success" | "error";
     message: string;
   } | null>(null);
 
-  // Fetch / Refresh products with active filters
+  // Modal states
+  const [stockModalProduct, setStockModalProduct] = React.useState<SerializedAdminProduct | null>(
+    null
+  );
+  const [deleteModalProduct, setDeleteModalProduct] = React.useState<SerializedAdminProduct | null>(
+    null
+  );
+  const [deleteLoading, setDeleteLoading] = React.useState(false);
+
+  // Fetch products wrapper
   const fetchProducts = React.useCallback(
     async (pageToFetch: number = currentPage) => {
       setLoading(true);
       try {
-        const result = await getAdminProductsAction({
+        const res = await getAdminProductsAction({
+          page: pageToFetch,
+          pageSize: 15,
           search: searchQuery.trim() || undefined,
           status: statusFilter,
           brandId: brandFilter || undefined,
@@ -143,25 +146,12 @@ export function ProductManagementTable({
           lowStock: lowStockFilter || undefined,
           sold: soldFilter || undefined,
           sortBy,
-          page: pageToFetch,
-          pageSize: 15,
         });
 
-        // Map dates to string
-        const mapped: SerializedAdminProduct[] = result.products.map((p) => ({
-          ...p,
-          createdAt: typeof p.createdAt === "string" ? p.createdAt : p.createdAt.toISOString(),
-          variants: p.variants.map((v) => ({
-            ...v,
-            price: Number(v.price),
-            costPrice: v.costPrice !== null && v.costPrice !== undefined ? Number(v.costPrice) : null,
-          })),
-        }));
-
-        setProducts(mapped);
-        setTotalCount(result.totalCount);
-        setTotalPages(result.totalPages);
-        setCurrentPage(result.currentPage);
+        setProducts(res.products as unknown as SerializedAdminProduct[]);
+        setTotalCount(res.totalCount);
+        setTotalPages(res.totalPages);
+        setCurrentPage(res.currentPage);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Failed to load products.";
         setActionNotice({ type: "error", message: msg });
@@ -169,16 +159,34 @@ export function ProductManagementTable({
         setLoading(false);
       }
     },
-    [searchQuery, statusFilter, brandFilter, categoryFilter, lowStockFilter, soldFilter, sortBy, currentPage]
+    [
+      searchQuery,
+      statusFilter,
+      brandFilter,
+      categoryFilter,
+      lowStockFilter,
+      soldFilter,
+      sortBy,
+      currentPage,
+    ]
   );
 
-  // Trigger search on debounce or filter change
+  // Trigger search on debounce
   React.useEffect(() => {
-    const handler = setTimeout(() => {
+    const timer = setTimeout(() => {
       fetchProducts(1);
     }, 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery, statusFilter, brandFilter, categoryFilter, lowStockFilter, soldFilter, sortBy, fetchProducts]);
+    return () => clearTimeout(timer);
+  }, [
+    searchQuery,
+    statusFilter,
+    brandFilter,
+    categoryFilter,
+    lowStockFilter,
+    soldFilter,
+    sortBy,
+    fetchProducts,
+  ]);
 
   // Handle Archive
   const handleArchive = async (productId: string, title: string) => {
@@ -190,7 +198,7 @@ export function ProductManagementTable({
       } else {
         setActionNotice({
           type: "success",
-          message: `"${title}" has been archived and removed from storefront catalog.`,
+          message: `"${title}" has been moved to ARCHIVED status.`,
         });
         fetchProducts(currentPage);
       }
@@ -247,27 +255,27 @@ export function ProductManagementTable({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-zinc-900">
       {/* Top Banner / Alerts */}
       {actionNotice && (
         <div
-          className={`flex items-center justify-between rounded-2xl p-4 text-xs font-medium border ${
+          className={`flex items-center justify-between rounded-2xl p-4 text-xs font-semibold border shadow-2xs ${
             actionNotice.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-              : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border-rose-200 text-rose-800"
           }`}
         >
           <div className="flex items-center gap-2">
             {actionNotice.type === "success" ? (
-              <CheckCircle className="h-4 w-4 shrink-0" />
+              <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
             ) : (
-              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
             )}
             <span>{actionNotice.message}</span>
           </div>
           <button
             onClick={() => setActionNotice(null)}
-            className="hover:opacity-75 transition-opacity"
+            className="hover:opacity-75 transition-opacity font-bold"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -275,15 +283,15 @@ export function ProductManagementTable({
       )}
 
       {/* Header and Add button */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-zinc-200 pb-6">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-2xl font-black uppercase tracking-tight text-zinc-900 flex items-center gap-2">
             <Package className="h-6 w-6 text-amber-500" />
             Sneaker Catalog &amp; Vault
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-zinc-500 mt-1">
             Manage vault inventory, condition disclosures, stock counts, and storage imagery. Total:{" "}
-            <span className="font-semibold text-white">{totalCount}</span> sneaker(s).
+            <span className="font-bold text-zinc-900">{totalCount}</span> sneaker(s).
           </p>
         </div>
 
@@ -292,7 +300,7 @@ export function ProductManagementTable({
             <Link href="/admin/products/new">
               <Button
                 size="sm"
-                className="bg-amber-500 hover:bg-amber-600 text-black font-bold flex items-center gap-1.5 shadow-lg shadow-amber-500/20"
+                className="bg-amber-500 hover:bg-amber-600 text-black font-bold flex items-center gap-1.5 shadow-xs"
               >
                 <Plus className="h-4 w-4" />
                 Add Sneaker
@@ -303,16 +311,16 @@ export function ProductManagementTable({
       </div>
 
       {/* Search and Filters Bar */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-4 space-y-3 shadow-xs">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
             <Input
               placeholder="Search title, SKU, colorway..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 bg-zinc-950 border-zinc-800 text-xs text-white placeholder:text-zinc-600"
+              className="pl-9 bg-white border-zinc-300 text-xs text-zinc-900 placeholder:text-zinc-400 shadow-2xs"
             />
           </div>
 
@@ -321,7 +329,7 @@ export function ProductManagementTable({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as ProductStatus | "ALL")}
-              className="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-xs text-zinc-300 focus:outline-none focus:border-amber-500"
+              className="w-full h-9 rounded-xl border border-zinc-300 bg-white px-3 text-xs text-zinc-700 focus:outline-none focus:border-amber-500 shadow-2xs font-medium"
             >
               <option value="ALL">All Statuses</option>
               <option value="ACTIVE">ACTIVE (Storefront Visible)</option>
@@ -335,7 +343,7 @@ export function ProductManagementTable({
             <select
               value={brandFilter}
               onChange={(e) => setBrandFilter(e.target.value)}
-              className="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-xs text-zinc-300 focus:outline-none focus:border-amber-500"
+              className="w-full h-9 rounded-xl border border-zinc-300 bg-white px-3 text-xs text-zinc-700 focus:outline-none focus:border-amber-500 shadow-2xs font-medium"
             >
               <option value="">All Brands</option>
               {brands.map((b) => (
@@ -351,7 +359,7 @@ export function ProductManagementTable({
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full h-9 rounded-md border border-zinc-800 bg-zinc-950 px-3 text-xs text-zinc-300 focus:outline-none focus:border-amber-500"
+              className="w-full h-9 rounded-xl border border-zinc-300 bg-white px-3 text-xs text-zinc-700 focus:outline-none focus:border-amber-500 shadow-2xs font-medium"
             >
               <option value="">All Categories</option>
               {categories.map((c) => (
@@ -364,35 +372,35 @@ export function ProductManagementTable({
         </div>
 
         {/* Quick Toggles & Sorting */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-800/60 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-zinc-100 text-xs">
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setLowStockFilter(!lowStockFilter)}
-              className={`px-3 py-1.5 rounded-xl border font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-xl border font-semibold transition-all flex items-center gap-1.5 shadow-2xs ${
                 lowStockFilter
-                  ? "bg-amber-500/10 border-amber-500/40 text-amber-400"
-                  : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                  ? "bg-amber-50 border-amber-300 text-amber-800"
+                  : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900"
               }`}
             >
-              <AlertTriangle className="h-3 w-3" />
+              <AlertTriangle className="h-3 w-3 text-amber-600" />
               Low Stock (&lt; 2 units)
             </button>
 
             <button
               onClick={() => setSoldFilter(!soldFilter)}
-              className={`px-3 py-1.5 rounded-xl border font-medium transition-all flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-xl border font-semibold transition-all flex items-center gap-1.5 shadow-2xs ${
                 soldFilter
-                  ? "bg-rose-500/10 border-rose-500/40 text-rose-400"
-                  : "bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white"
+                  ? "bg-rose-50 border-rose-300 text-rose-800"
+                  : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900"
               }`}
             >
-              <Package className="h-3 w-3" />
+              <Package className="h-3 w-3 text-rose-600" />
               Sold Out
             </button>
           </div>
 
           <div className="flex items-center gap-2">
-            <ArrowUpDown className="h-3 w-3 text-zinc-500" />
+            <ArrowUpDown className="h-3 w-3 text-zinc-400" />
             <span className="text-zinc-500">Sort:</span>
             <select
               value={sortBy}
@@ -407,7 +415,7 @@ export function ProductManagementTable({
                     | "price_desc"
                 )
               }
-              className="h-8 rounded-lg border border-zinc-800 bg-zinc-950 px-2.5 text-xs text-zinc-300 focus:outline-none focus:border-amber-500"
+              className="h-8 rounded-lg border border-zinc-300 bg-white px-2.5 text-xs text-zinc-700 focus:outline-none focus:border-amber-500 shadow-2xs font-medium"
             >
               <option value="newest">Newest First</option>
               <option value="oldest">Oldest First</option>
@@ -421,10 +429,10 @@ export function ProductManagementTable({
       </div>
 
       {/* Product List Table */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden shadow-xl">
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-zinc-800 bg-zinc-950/70 text-zinc-400 uppercase tracking-wider text-[11px] font-semibold">
+            <thead className="border-b border-zinc-200 bg-zinc-50/80 text-zinc-600 uppercase tracking-wider text-[11px] font-bold">
               <tr>
                 <th className="py-3.5 px-4">Sneaker</th>
                 <th className="py-3.5 px-4">Brand / Cat</th>
@@ -434,7 +442,7 @@ export function ProductManagementTable({
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y divide-zinc-100">
               {loading ? (
                 <tr>
                   <td colSpan={6} className="py-12 text-center text-zinc-500">
@@ -461,12 +469,12 @@ export function ProductManagementTable({
                   return (
                     <tr
                       key={product.id}
-                      className="hover:bg-zinc-800/30 transition-colors group"
+                      className="hover:bg-zinc-50/70 transition-colors group"
                     >
                       {/* Sneaker Thumbnail + Title */}
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <div className="relative h-12 w-12 rounded-xl border border-zinc-800 bg-zinc-950 shrink-0 overflow-hidden flex items-center justify-center">
+                          <div className="relative h-12 w-12 rounded-xl border border-zinc-200 bg-zinc-100 shrink-0 overflow-hidden flex items-center justify-center">
                             {primaryImage ? (
                               <Image
                                 src={primaryImage.url}
@@ -476,7 +484,7 @@ export function ProductManagementTable({
                                 className="object-cover"
                               />
                             ) : (
-                              <Package className="h-5 w-5 text-zinc-600" />
+                              <Package className="h-5 w-5 text-zinc-400" />
                             )}
                           </div>
                           <div className="space-y-0.5 max-w-xs">
@@ -484,7 +492,7 @@ export function ProductManagementTable({
                               {isAdmin ? (
                                 <Link
                                   href={`/admin/products/${product.id}/edit`}
-                                  className="font-bold text-white hover:text-amber-400 transition-colors line-clamp-1"
+                                  className="font-bold text-zinc-900 hover:text-amber-600 transition-colors line-clamp-1"
                                 >
                                   {product.title}
                                 </Link>
@@ -492,14 +500,14 @@ export function ProductManagementTable({
                                 <button
                                   type="button"
                                   onClick={() => setStockModalProduct(product)}
-                                  className="font-bold text-white hover:text-amber-400 text-left transition-colors line-clamp-1 cursor-pointer"
+                                  className="font-bold text-zinc-900 hover:text-amber-600 text-left transition-colors line-clamp-1 cursor-pointer"
                                   title="Click to adjust stock"
                                 >
                                   {product.title}
                                 </button>
                               )}
                               {product.isFeatured && (
-                                <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] py-0 px-1">
+                                <Badge className="bg-amber-50 text-amber-800 border-amber-200 text-[9px] py-0 px-1 font-bold">
                                   Featured
                                 </Badge>
                               )}
@@ -513,9 +521,9 @@ export function ProductManagementTable({
                       </td>
 
                       {/* Brand & Category */}
-                      <td className="py-3 px-4 text-zinc-300">
+                      <td className="py-3 px-4 text-zinc-700">
                         <div className="space-y-0.5">
-                          <span className="font-semibold block text-white">{product.brand.name}</span>
+                          <span className="font-bold block text-zinc-900">{product.brand.name}</span>
                           <span className="text-[11px] text-zinc-500 block">{product.category.name}</span>
                         </div>
                       </td>
@@ -523,17 +531,17 @@ export function ProductManagementTable({
                       {/* Status Badge */}
                       <td className="py-3 px-4">
                         {product.status === ProductStatus.ACTIVE && (
-                          <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[10px] font-semibold">
+                          <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200 text-[10px] font-bold">
                             ACTIVE
                           </Badge>
                         )}
                         {product.status === ProductStatus.DRAFT && (
-                          <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px] font-semibold">
+                          <Badge className="bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-bold">
                             DRAFT
                           </Badge>
                         )}
                         {product.status === ProductStatus.ARCHIVED && (
-                          <Badge className="bg-zinc-800 text-zinc-400 border-zinc-700 text-[10px] font-semibold">
+                          <Badge className="bg-zinc-100 text-zinc-600 border-zinc-200 text-[10px] font-bold">
                             ARCHIVED
                           </Badge>
                         )}
@@ -546,20 +554,20 @@ export function ProductManagementTable({
                             <span
                               className={`font-black text-xs ${
                                 isSoldOut
-                                  ? "text-rose-400"
+                                  ? "text-rose-600"
                                   : totalStock <= 2
-                                  ? "text-amber-400"
-                                  : "text-white"
+                                  ? "text-amber-700"
+                                  : "text-zinc-900"
                               }`}
                             >
                               {totalStock} pair{totalStock !== 1 ? "s" : ""}
                             </span>
                             {isSoldOut ? (
-                              <Badge className="bg-rose-500/10 text-rose-400 border-rose-500/20 text-[9px] py-0 px-1">
+                              <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[9px] py-0 px-1 font-bold">
                                 Sold Out
                               </Badge>
                             ) : totalStock <= 2 ? (
-                              <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[9px] py-0 px-1">
+                              <Badge className="bg-amber-50 text-amber-800 border-amber-200 text-[9px] py-0 px-1 font-bold">
                                 Low Stock
                               </Badge>
                             ) : null}
@@ -571,7 +579,7 @@ export function ProductManagementTable({
                       </td>
 
                       {/* Price Range */}
-                      <td className="py-3 px-4 text-zinc-300 font-medium">
+                      <td className="py-3 px-4 text-zinc-800 font-bold">
                         {minPrice === maxPrice ? (
                           formatPrice(minPrice)
                         ) : (
@@ -592,9 +600,9 @@ export function ProductManagementTable({
                                   variant="outline"
                                   size="sm"
                                   title="Edit sneaker details & images"
-                                  className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-zinc-700 bg-zinc-900/60 hover:bg-zinc-800 text-white"
+                                  className="h-7 px-2.5 text-xs font-bold gap-1.5 border-zinc-200 bg-white hover:bg-zinc-50 text-zinc-800 shadow-2xs"
                                 >
-                                  <Edit className="h-3.5 w-3.5 text-amber-400" />
+                                  <Edit className="h-3.5 w-3.5 text-amber-600" />
                                   <span>Edit</span>
                                 </Button>
                               </Link>
@@ -605,7 +613,7 @@ export function ProductManagementTable({
                                 size="sm"
                                 onClick={() => setStockModalProduct(product)}
                                 title="Adjust inventory stock"
-                                className="h-7 px-2 text-zinc-400 hover:text-amber-400 hover:bg-amber-500/10"
+                                className="h-7 px-2 text-zinc-500 hover:text-amber-600 hover:bg-amber-50"
                               >
                                 <Package className="h-3.5 w-3.5" />
                               </Button>
@@ -617,7 +625,7 @@ export function ProductManagementTable({
                                   size="sm"
                                   onClick={() => handleRestore(product.id, product.title)}
                                   title="Restore to ACTIVE"
-                                  className="h-7 px-2 text-zinc-400 hover:text-emerald-400 hover:bg-emerald-500/10"
+                                  className="h-7 px-2 text-zinc-500 hover:text-emerald-600 hover:bg-emerald-50"
                                 >
                                   <RefreshCw className="h-3.5 w-3.5" />
                                 </Button>
@@ -627,7 +635,7 @@ export function ProductManagementTable({
                                   size="sm"
                                   onClick={() => handleArchive(product.id, product.title)}
                                   title="Archive sneaker"
-                                  className="h-7 px-2 text-zinc-400 hover:text-amber-400 hover:bg-amber-500/10"
+                                  className="h-7 px-2 text-zinc-500 hover:text-amber-600 hover:bg-amber-50"
                                 >
                                   <Archive className="h-3.5 w-3.5" />
                                 </Button>
@@ -639,7 +647,7 @@ export function ProductManagementTable({
                                 size="sm"
                                 onClick={() => setDeleteModalProduct(product)}
                                 title="Delete sneaker"
-                                className="h-7 px-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10"
+                                className="h-7 px-2 text-zinc-500 hover:text-rose-600 hover:bg-rose-50"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
@@ -651,7 +659,7 @@ export function ProductManagementTable({
                               size="sm"
                               onClick={() => setStockModalProduct(product)}
                               title="Adjust inventory stock quantities"
-                              className="h-7 px-2.5 text-xs font-semibold gap-1.5 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400"
+                              className="h-7 px-2.5 text-xs font-bold gap-1.5 border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 shadow-2xs"
                             >
                               <Package className="h-3.5 w-3.5" />
                               <span>Adjust stock</span>
@@ -669,10 +677,10 @@ export function ProductManagementTable({
 
         {/* Pagination Bar */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-zinc-800 bg-zinc-950/40 p-4 text-xs text-zinc-400">
+          <div className="flex items-center justify-between border-t border-zinc-200 bg-zinc-50/60 p-4 text-xs text-zinc-600">
             <div>
-              Page <span className="font-semibold text-white">{currentPage}</span> of{" "}
-              <span className="font-semibold text-white">{totalPages}</span> ({totalCount} total)
+              Page <span className="font-bold text-zinc-900">{currentPage}</span> of{" "}
+              <span className="font-bold text-zinc-900">{totalPages}</span> ({totalCount} total)
             </div>
             <div className="flex items-center gap-1.5">
               <Button
@@ -680,7 +688,7 @@ export function ProductManagementTable({
                 size="sm"
                 disabled={currentPage <= 1 || loading}
                 onClick={() => fetchProducts(currentPage - 1)}
-                className="h-8 border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white"
+                className="h-8 border-zinc-200 bg-white text-zinc-700 hover:text-zinc-900 shadow-2xs"
               >
                 <ChevronLeft className="h-3.5 w-3.5 mr-1" /> Previous
               </Button>
@@ -689,7 +697,7 @@ export function ProductManagementTable({
                 size="sm"
                 disabled={currentPage >= totalPages || loading}
                 onClick={() => fetchProducts(currentPage + 1)}
-                className="h-8 border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white"
+                className="h-8 border-zinc-200 bg-white text-zinc-700 hover:text-zinc-900 shadow-2xs"
               >
                 Next <ChevronRight className="h-3.5 w-3.5 ml-1" />
               </Button>
@@ -715,21 +723,21 @@ export function ProductManagementTable({
           open={!!deleteModalProduct}
           onOpenChange={(open) => !open && setDeleteModalProduct(null)}
         >
-          <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800 text-white p-6">
+          <DialogContent className="sm:max-w-md bg-white border-rose-200 text-zinc-900 p-6 shadow-2xl">
             <DialogHeader className="space-y-1">
-              <DialogTitle className="flex items-center gap-2 text-base font-bold text-rose-500">
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-rose-600">
                 <AlertTriangle className="h-5 w-5" />
                 Confirm Sneaker Deletion
               </DialogTitle>
-              <DialogDescription className="text-xs text-zinc-400">
+              <DialogDescription className="text-xs text-zinc-500">
                 Are you sure you want to delete{" "}
-                <span className="font-semibold text-white">{deleteModalProduct.title}</span>?
+                <span className="font-bold text-zinc-900">{deleteModalProduct.title}</span>?
               </DialogDescription>
             </DialogHeader>
 
-            <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 p-3 text-xs text-rose-300 space-y-1.5">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800 space-y-1.5">
               <p className="font-bold">Permanent Deletion Warning</p>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-600">
                 This action will delete all image assets from Supabase storage and remove variant records.
                 If any variant of this sneaker has historical order records, deletion will be blocked by
                 database integrity constraints. Consider archiving instead.
@@ -742,7 +750,7 @@ export function ProductManagementTable({
                 variant="outline"
                 size="sm"
                 onClick={() => setDeleteModalProduct(null)}
-                className="border-zinc-800 text-zinc-400 hover:text-white"
+                className="border-zinc-200 text-zinc-700 hover:bg-zinc-100 font-semibold"
               >
                 Cancel
               </Button>

@@ -123,41 +123,41 @@ export function StockAdjustmentModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800 text-white p-6">
+      <DialogContent className="sm:max-w-md bg-white border-zinc-200 text-zinc-900 shadow-2xl p-6">
         <DialogHeader className="space-y-1">
-          <DialogTitle className="flex items-center gap-2 text-base font-bold text-white">
+          <DialogTitle className="flex items-center gap-2 text-base font-bold text-zinc-900">
             <Package className="h-5 w-5 text-amber-500" />
             Adjust Inventory Stock
           </DialogTitle>
-          <DialogDescription className="text-xs text-zinc-400">
+          <DialogDescription className="text-xs text-zinc-500">
             {productTitle}
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4 pt-2">
           {error && (
-            <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-400">
-              <AlertTriangle className="h-4 w-4 shrink-0" />
+            <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 font-medium">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
               <span>{error}</span>
             </div>
           )}
 
           {successMsg && (
-            <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-400">
-              <CheckCircle className="h-4 w-4 shrink-0" />
+            <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 font-medium">
+              <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
               <span>{successMsg}</span>
             </div>
           )}
 
           {/* Select Variant */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
               Select Variant / Size
             </label>
             <select
               value={activeVariantId}
               onChange={(e) => setSelectedVariantId(e.target.value)}
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-amber-500 shadow-2xs font-medium"
             >
               {variants.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -168,9 +168,9 @@ export function StockAdjustmentModal({
           </div>
 
           {isOneOfOne ? (
-            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300">
-              <p className="font-semibold">Fixed 1-of-1 Allocation</p>
-              <p className="text-[11px] text-zinc-400 mt-1">
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <p className="font-bold">Fixed 1-of-1 Allocation</p>
+              <p className="text-[11px] text-zinc-600 mt-1">
                 This pair is configured as a unique 1-of-1 grail. Its quantity is locked to 1. Quantity adjustments are disabled.
               </p>
             </div>
@@ -178,31 +178,31 @@ export function StockAdjustmentModal({
             <>
               {/* Add vs Remove toggle */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
                   Adjustment Type
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setDeltaType("add")}
-                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-semibold transition-all ${
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-bold transition-all ${
                       deltaType === "add"
-                        ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
-                        : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white"
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-xs"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900"
                     }`}
                   >
-                    <TrendingUp className="h-3.5 w-3.5" /> + Increase Stock
+                    <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> + Increase Stock
                   </button>
                   <button
                     type="button"
                     onClick={() => setDeltaType("remove")}
-                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-semibold transition-all ${
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-bold transition-all ${
                       deltaType === "remove"
-                        ? "border-rose-500/50 bg-rose-500/10 text-rose-400"
-                        : "border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-white"
+                        ? "border-rose-300 bg-rose-50 text-rose-800 shadow-xs"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900"
                     }`}
                   >
-                    <TrendingDown className="h-3.5 w-3.5" /> - Decrease Stock
+                    <TrendingDown className="h-3.5 w-3.5 text-rose-600" /> - Decrease Stock
                   </button>
                 </div>
               </div>
@@ -210,7 +210,7 @@ export function StockAdjustmentModal({
               {/* Quantity input & Preview */}
               <div className="grid grid-cols-2 gap-3 items-center">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
                     Units ({deltaType === "add" ? "+" : "-"})
                   </label>
                   <Input
@@ -218,17 +218,17 @@ export function StockAdjustmentModal({
                     min="1"
                     value={quantity}
                     onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="bg-zinc-900 border-zinc-800 text-white"
+                    className="bg-white border-zinc-300 text-zinc-900"
                   />
                 </div>
 
-                <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-2.5 text-center">
-                  <span className="text-[10px] text-zinc-500 block uppercase font-medium">
+                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-2.5 text-center">
+                  <span className="text-[10px] text-zinc-500 block uppercase font-bold">
                     Projected Stock
                   </span>
                   <span
                     className={`text-base font-black ${
-                      projectedStock < 0 ? "text-rose-400" : "text-white"
+                      projectedStock < 0 ? "text-rose-600" : "text-zinc-900"
                     }`}
                   >
                     {currentStock} → {projectedStock}
@@ -238,13 +238,13 @@ export function StockAdjustmentModal({
 
               {/* Reason */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
                   Adjustment Reason
                 </label>
                 <select
                   value={reason}
                   onChange={(e) => setReason(e.target.value as StockAdjustmentReason)}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-amber-500 font-medium"
                 >
                   {REASONS.map((r) => (
                     <option key={r.value} value={r.value}>
@@ -256,14 +256,14 @@ export function StockAdjustmentModal({
 
               {/* Internal Notes */}
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
                   Notes / Audit Trail Details (Optional)
                 </label>
                 <Input
                   placeholder="e.g. Supplier PO #4092 or shelf count discrepancy"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="bg-zinc-900 border-zinc-800 text-xs text-white"
+                  className="bg-white border-zinc-300 text-xs text-zinc-900 placeholder:text-zinc-400"
                 />
               </div>
             </>
@@ -275,7 +275,7 @@ export function StockAdjustmentModal({
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
-              className="border-zinc-800 text-zinc-400 hover:text-white"
+              className="border-zinc-200 text-zinc-700 hover:bg-zinc-100 font-semibold"
             >
               Cancel
             </Button>
@@ -283,7 +283,7 @@ export function StockAdjustmentModal({
               type="submit"
               size="sm"
               disabled={loading || isOneOfOne || projectedStock < 0}
-              className="bg-amber-500 hover:bg-amber-600 text-black font-bold"
+              className="bg-amber-500 hover:bg-amber-600 text-black font-bold shadow-xs"
             >
               {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               Save Adjustment

@@ -38,6 +38,7 @@ export default async function AdminProductsPage(props: AdminProductsPageProps) {
   const initialProducts: SerializedAdminProduct[] = productsResult.products.map((p) => ({
     ...p,
     createdAt: typeof p.createdAt === "string" ? p.createdAt : p.createdAt.toISOString(),
+    updatedAt: typeof p.updatedAt === "string" ? p.updatedAt : p.updatedAt.toISOString(),
     variants: p.variants.map((v) => ({
       ...v,
       price: Number(v.price),

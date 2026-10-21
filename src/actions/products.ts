@@ -663,7 +663,14 @@ export async function createVariantAction(
     safeRevalidate(`/admin/products/${productId}`);
     safeRevalidate("/products");
 
-    return { success: true, variant };
+    return {
+      success: true,
+      variant: {
+        ...variant,
+        price: Number(variant.price),
+        costPrice: variant.costPrice ? Number(variant.costPrice) : null,
+      },
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to create variant.";
     return { error: msg };
@@ -789,7 +796,14 @@ export async function updateVariantAction(
     safeRevalidate("/products");
     safeRevalidate(`/products/${existing.product.slug}`);
 
-    return { success: true, variant: updated };
+    return {
+      success: true,
+      variant: {
+        ...updated,
+        price: Number(updated.price),
+        costPrice: updated.costPrice ? Number(updated.costPrice) : null,
+      },
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to update variant.";
     return { error: msg };

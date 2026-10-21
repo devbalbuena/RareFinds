@@ -98,7 +98,7 @@ export function ProductImageManager({
           throw new Error(signedRes.error || `Failed to prepare upload for ${file.name}`);
         }
 
-        // 2. Direct upload to Supabase storage
+        // 2. Direct upload via PUT to Supabase
         const uploadRes = await fetch(signedRes.signedUrl, {
           method: "PUT",
           headers: {
@@ -108,37 +108,38 @@ export function ProductImageManager({
         });
 
         if (!uploadRes.ok) {
-          const errText = await uploadRes.text();
-          throw new Error(`Upload to storage failed for ${file.name}: ${errText || uploadRes.statusText}`);
+          throw new Error(`Failed to upload ${file.name} to storage bucket (status ${uploadRes.status}).`);
         }
 
-        // 3. Verify on server and save to database
+        // 3. Save DB record with public CDN url
         const saveRes = await saveProductImageAction(
           productId,
-          signedRes.storagePath,
-          file.name.replace(/\.[^/.]+$/, "")
+          signedRes.publicUrl,
+          file.name.replace(/\.[^/.]+$/, ""),
+          currentList.length === 0 // Make primary if first image
         );
 
         if (saveRes.error || !saveRes.image) {
-          throw new Error(saveRes.error || `Verification failed for ${file.name}`);
+          throw new Error(saveRes.error || `Failed to record image record for ${file.name}`);
         }
 
-        currentList.push({
+        const newImg: ManagedProductImage = {
           id: saveRes.image.id,
           url: saveRes.image.url,
           altText: saveRes.image.altText,
           isPrimary: saveRes.image.isPrimary,
           sortOrder: saveRes.image.sortOrder,
-        });
+        };
+
+        currentList.push(newImg);
         newlyAddedCount++;
       }
 
-      const sorted = [...currentList].sort((a, b) => a.sortOrder - b.sortOrder);
-      setImages(sorted);
-      onImagesChange?.(sorted);
-      setSuccess(`Successfully uploaded and verified ${newlyAddedCount} image(s).`);
+      setImages(currentList);
+      onImagesChange?.(currentList);
+      setSuccess(`Successfully uploaded ${newlyAddedCount} image(s).`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Image upload failed.";
+      const msg = err instanceof Error ? err.message : "Failed to upload images.";
       setError(msg);
     } finally {
       setUploading(false);
@@ -147,7 +148,7 @@ export function ProductImageManager({
     }
   };
 
-  // Reorder Left / Right
+  // Reorder Images (Move left / right)
   const handleMove = async (index: number, direction: "left" | "right") => {
     const targetIndex = direction === "left" ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= images.length) return;
@@ -160,11 +161,7 @@ export function ProductImageManager({
     reordered[index] = reordered[targetIndex];
     reordered[targetIndex] = temp;
 
-    // Update sortOrders locally
-    const updated = reordered.map((img, idx) => ({
-      ...img,
-      sortOrder: idx,
-    }));
+    const updated = reordered.map((img, idx) => ({ ...img, sortOrder: idx }));
     setImages(updated);
 
     try {
@@ -172,21 +169,21 @@ export function ProductImageManager({
         productId,
         updated.map((img) => img.id)
       );
+
       if (res.error) {
         setError(res.error);
-        // revert
-        setImages(images);
+        setImages(images); // Revert
       } else {
         onImagesChange?.(updated);
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to reorder.";
+      const msg = err instanceof Error ? err.message : "Failed to reorder images.";
       setError(msg);
       setImages(images);
     }
   };
 
-  // Set Primary
+  // Set Primary Image
   const handleSetPrimary = async (imageId: string) => {
     setError(null);
     setSuccess(null);
@@ -247,24 +244,24 @@ export function ProductImageManager({
   };
 
   return (
-    <div className="space-y-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-800/80 pb-4">
+    <div className="space-y-4 rounded-2xl border border-zinc-200 bg-white p-6 shadow-xs text-zinc-900">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-zinc-200 pb-4">
         <div>
-          <h3 className="text-base font-bold text-white flex items-center gap-2">
+          <h3 className="text-base font-bold text-zinc-900 flex items-center gap-2">
             <ImageIcon className="h-5 w-5 text-amber-500" />
             Product Gallery &amp; Storage Imagery
           </h3>
-          <p className="text-xs text-zinc-400 mt-0.5">
+          <p className="text-xs text-zinc-500 mt-0.5">
             Signed direct-upload to Supabase. Images are verified for integrity, format, and magic bytes.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <Badge
-            className={`text-xs font-semibold ${
+            className={`text-xs font-bold ${
               images.length >= MAX_IMAGES
-                ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
-                : "bg-zinc-800 text-zinc-300 border-zinc-700"
+                ? "bg-amber-50 text-amber-800 border-amber-200"
+                : "bg-zinc-100 text-zinc-700 border-zinc-200"
             }`}
           >
             {images.length} / {MAX_IMAGES} Images
@@ -274,15 +271,15 @@ export function ProductImageManager({
 
       {/* Notifications */}
       {error && (
-        <div className="flex items-center gap-2 rounded-xl bg-rose-500/10 border border-rose-500/20 p-3 text-xs text-rose-400">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl bg-rose-50 border border-rose-200 p-3 text-xs text-rose-800 font-semibold shadow-2xs">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
           <span>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-400">
-          <CheckCircle className="h-4 w-4 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 p-3 text-xs text-emerald-800 font-semibold shadow-2xs">
+          <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
           <span>{success}</span>
         </div>
       )}
@@ -302,25 +299,25 @@ export function ProductImageManager({
           />
           <label
             htmlFor="product-images-input"
-            className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-zinc-700 bg-zinc-950/60 p-6 text-center cursor-pointer transition-all hover:border-amber-500/60 hover:bg-zinc-900/50 ${
+            className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-zinc-300 bg-zinc-50/60 p-6 text-center cursor-pointer transition-all hover:border-amber-500/60 hover:bg-amber-50/30 ${
               uploading ? "opacity-50 pointer-events-none" : ""
             }`}
           >
             {uploading ? (
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="h-8 w-8 text-amber-500 animate-spin" />
-                <p className="text-xs font-semibold text-white">{uploadProgress || "Uploading..."}</p>
+                <p className="text-xs font-bold text-zinc-900">{uploadProgress || "Uploading..."}</p>
                 <p className="text-[11px] text-zinc-500">Verifying storage integrity and magic bytes...</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-1.5">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 mb-1">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 mb-1">
                   <UploadCloud className="h-5 w-5" />
                 </div>
-                <p className="text-xs font-bold text-white">
+                <p className="text-xs font-bold text-zinc-900">
                   Click or drag images here to upload
                 </p>
-                <p className="text-[11px] text-zinc-400">
+                <p className="text-[11px] text-zinc-500">
                   JPEG, PNG, WebP up to 5MB each. Max {MAX_IMAGES - images.length} more image(s).
                 </p>
               </div>
@@ -328,7 +325,7 @@ export function ProductImageManager({
           </label>
         </div>
       ) : (
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 text-center text-xs text-zinc-400">
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-4 text-center text-xs text-zinc-500">
           Maximum limit of {MAX_IMAGES} images reached for this sneaker. Delete an image to upload a new one.
         </div>
       )}
@@ -339,14 +336,14 @@ export function ProductImageManager({
           {images.map((img, index) => (
             <div
               key={img.id}
-              className={`group relative rounded-2xl border bg-zinc-950 overflow-hidden flex flex-col transition-all ${
+              className={`group relative rounded-2xl border bg-white overflow-hidden flex flex-col transition-all shadow-xs ${
                 img.isPrimary
-                  ? "border-amber-500/60 shadow-lg shadow-amber-500/10 ring-1 ring-amber-500/40"
-                  : "border-zinc-800 hover:border-zinc-700"
+                  ? "border-amber-400 ring-2 ring-amber-400/30"
+                  : "border-zinc-200 hover:border-zinc-300"
               }`}
             >
               {/* Image Preview */}
-              <div className="relative aspect-square w-full bg-zinc-900 overflow-hidden">
+              <div className="relative aspect-square w-full bg-zinc-100 overflow-hidden">
                 <Image
                   src={img.url}
                   alt={img.altText || `Image ${index + 1}`}
@@ -357,20 +354,20 @@ export function ProductImageManager({
 
                 {/* Primary Badge */}
                 {img.isPrimary && (
-                  <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-black shadow-md">
+                  <div className="absolute top-2 left-2 flex items-center gap-1 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-black shadow-xs">
                     <Star className="h-3 w-3 fill-black" />
                     PRIMARY
                   </div>
                 )}
 
                 {/* Position Index */}
-                <div className="absolute bottom-2 left-2 rounded-md bg-black/70 backdrop-blur-sm px-1.5 py-0.5 text-[10px] font-bold text-zinc-300">
+                <div className="absolute bottom-2 left-2 rounded-md bg-black/60 backdrop-blur-xs px-1.5 py-0.5 text-[10px] font-bold text-white">
                   #{index + 1}
                 </div>
               </div>
 
               {/* Controls bar */}
-              <div className="p-2.5 flex items-center justify-between border-t border-zinc-800/80 bg-zinc-950/80">
+              <div className="p-2.5 flex items-center justify-between border-t border-zinc-100 bg-zinc-50/80">
                 {/* Reorder Arrows */}
                 <div className="flex items-center gap-1">
                   <Button
@@ -380,7 +377,7 @@ export function ProductImageManager({
                     disabled={index === 0}
                     onClick={() => handleMove(index, "left")}
                     title="Move earlier"
-                    className="h-6 w-6 p-0 text-zinc-400 hover:text-white disabled:opacity-30"
+                    className="h-6 w-6 p-0 text-zinc-500 hover:text-zinc-900 disabled:opacity-30"
                   >
                     <ArrowLeft className="h-3 w-3" />
                   </Button>
@@ -391,7 +388,7 @@ export function ProductImageManager({
                     disabled={index === images.length - 1}
                     onClick={() => handleMove(index, "right")}
                     title="Move later"
-                    className="h-6 w-6 p-0 text-zinc-400 hover:text-white disabled:opacity-30"
+                    className="h-6 w-6 p-0 text-zinc-500 hover:text-zinc-900 disabled:opacity-30"
                   >
                     <ArrowRight className="h-3 w-3" />
                   </Button>
@@ -406,7 +403,7 @@ export function ProductImageManager({
                       size="sm"
                       onClick={() => handleSetPrimary(img.id)}
                       title="Make primary hero image"
-                      className="h-6 px-1.5 text-[10px] text-zinc-400 hover:text-amber-400 hover:bg-amber-500/10"
+                      className="h-6 px-1.5 text-[10px] text-zinc-600 hover:text-amber-700 hover:bg-amber-50 font-bold"
                     >
                       <Star className="h-3 w-3 mr-1" /> Primary
                     </Button>
@@ -419,7 +416,7 @@ export function ProductImageManager({
                     size="sm"
                     onClick={() => handleDelete(img.id)}
                     title="Delete image"
-                    className="h-6 w-6 p-0 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10"
+                    className="h-6 w-6 p-0 text-zinc-400 hover:text-rose-600 hover:bg-rose-50"
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -429,7 +426,7 @@ export function ProductImageManager({
           ))}
         </div>
       ) : (
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/30 p-8 text-center text-zinc-500 text-xs">
+        <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-8 text-center text-zinc-400 text-xs font-medium">
           No images uploaded yet. Upload at least one high-resolution photo for the sneaker.
         </div>
       )}
