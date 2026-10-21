@@ -77,7 +77,7 @@ export async function createUserOrStaffAction(input: CreateStaffInput) {
         role: role as Role,
         isActive: true,
       },
-      select: { id: true, name: true, email: true, role: true, isActive: true },
+      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
     });
 
     // Record in Audit Log
@@ -99,7 +99,13 @@ export async function createUserOrStaffAction(input: CreateStaffInput) {
     safeRevalidatePath("/admin/users");
     safeRevalidatePath("/admin/audit");
 
-    return { success: true, user: newUser };
+    return {
+      success: true,
+      user: {
+        ...newUser,
+        createdAt: newUser.createdAt.toISOString(),
+      },
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to create staff account.";
     return { error: msg };
@@ -124,9 +130,10 @@ export async function promoteCustomerAction(targetUserId: string, targetRole: "S
 
     const previousRole = target.role;
 
-    await prisma.user.update({
+    const updated = await prisma.user.update({
       where: { id: targetUserId },
       data: { role: targetRole as Role, isActive: true },
+      select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },
     });
 
     await prisma.auditLog.create({
@@ -148,7 +155,14 @@ export async function promoteCustomerAction(targetUserId: string, targetRole: "S
     safeRevalidatePath("/admin/users");
     safeRevalidatePath("/admin/audit");
 
-    return { success: true, message: `Successfully promoted ${target.email} to ${targetRole}.` };
+    return {
+      success: true,
+      message: `Successfully promoted ${target.email} to ${targetRole}.`,
+      user: {
+        ...updated,
+        createdAt: updated.createdAt.toISOString(),
+      },
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to promote user.";
     return { error: msg };

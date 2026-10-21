@@ -105,19 +105,9 @@ export function UsersManagementTable({
       return;
     }
 
-    if (res.success && res.user) {
-      setAddSuccess(`Successfully created ${res.user.role} account for ${res.user.email}`);
-      setUsers((prev) => [
-        {
-          id: res.user!.id,
-          name: res.user!.name,
-          email: res.user!.email,
-          role: res.user!.role,
-          isActive: res.user!.isActive,
-          createdAt: new Date().toISOString(),
-        },
-        ...prev,
-      ]);
+    if (res.user) {
+      setAddSuccess(`Account for ${res.user.email} created as ${res.user.role}.`);
+      setUsers((prev) => [res.user!, ...prev]);
       setAddName("");
       setAddEmail("");
       setAddPassword("");
@@ -130,8 +120,8 @@ export function UsersManagementTable({
 
   const handlePromoteExisting = async () => {
     if (!existingCustomerData) return;
-    setIsPending(true);
     setAddError(null);
+    setIsPending(true);
 
     const res = await promoteCustomerAction(existingCustomerData.id, addRole);
     setIsPending(false);
@@ -141,13 +131,11 @@ export function UsersManagementTable({
       return;
     }
 
-    if (res.success) {
+    if (res.user) {
       setUsers((prev) =>
-        prev.map((u) =>
-          u.id === existingCustomerData.id ? { ...u, role: addRole } : u
-        )
+        prev.map((u) => (u.id === res.user!.id ? res.user! : u))
       );
-      setAddSuccess(res.message || "Customer promoted successfully.");
+      setAddSuccess(`Customer ${res.user.email} promoted to ${res.user.role}.`);
       setExistingCustomerData(null);
       setTimeout(() => {
         setIsAddModalOpen(false);
@@ -177,12 +165,11 @@ export function UsersManagementTable({
     });
   };
 
-  const handleToggleActive = async (userId: string, currentStatus: boolean) => {
+  const handleToggleActive = async (userId: string, currentActive: boolean) => {
     setActionAlert(null);
     setIsPending(true);
 
-    const newStatus = !currentStatus;
-    const res = await toggleUserActiveAction(userId, newStatus);
+    const res = await toggleUserActiveAction(userId, !currentActive);
     setIsPending(false);
 
     if (res.error) {
@@ -191,36 +178,36 @@ export function UsersManagementTable({
     }
 
     setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, isActive: newStatus } : u))
+      prev.map((u) => (u.id === userId ? { ...u, isActive: !currentActive } : u))
     );
     setActionAlert({
       type: "success",
-      message: newStatus
-        ? "User account successfully reactivated."
+      message: !currentActive
+        ? "User account reactivated."
         : "User account deactivated. User is blocked from signing in immediately.",
     });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-zinc-900">
       {/* Action Notification Alert */}
       {actionAlert && (
         <div
-          className={`p-4 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in ${
+          className={`p-4 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in shadow-2xs font-medium ${
             actionAlert.type === "error"
-              ? "bg-red-500/10 border-red-500/30 text-red-400"
-              : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              ? "bg-rose-50 border-rose-200 text-rose-800"
+              : "bg-emerald-50 border-emerald-200 text-emerald-800"
           }`}
         >
           {actionAlert.type === "error" ? (
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
           ) : (
-            <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <CheckCircle className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
           )}
-          <div className="flex-1 font-medium">{actionAlert.message}</div>
+          <div className="flex-1">{actionAlert.message}</div>
           <button
             onClick={() => setActionAlert(null)}
-            className="text-zinc-500 hover:text-white text-xs cursor-pointer"
+            className="text-zinc-400 hover:text-zinc-700 font-bold text-sm cursor-pointer"
           >
             &times;
           </button>
@@ -231,19 +218,19 @@ export function UsersManagementTable({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1 max-w-md">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400" />
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search by name or email..."
-              className="pl-9 h-10 text-xs bg-zinc-900 border-zinc-800 text-white placeholder:text-zinc-500"
+              className="pl-9 h-10 text-xs bg-white border-zinc-300 text-zinc-900 placeholder:text-zinc-400 shadow-2xs font-medium"
             />
           </div>
 
           <select
             value={roleFilter}
             onChange={(e) => setRoleFilter(e.target.value)}
-            className="h-10 rounded-xl border border-zinc-800 bg-zinc-900 px-3 text-xs text-zinc-300 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+            className="h-10 rounded-xl border border-zinc-300 bg-white px-3 text-xs text-zinc-700 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 shadow-2xs font-medium"
           >
             <option value="ALL">All Roles</option>
             <option value="ADMIN">Admins</option>
@@ -259,7 +246,7 @@ export function UsersManagementTable({
             setAddSuccess(null);
             setExistingCustomerData(null);
           }}
-          className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-10 gap-1.5 cursor-pointer"
+          className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-10 gap-1.5 cursor-pointer shadow-xs"
         >
           <UserPlus className="h-4 w-4" />
           <span>Add Staff Account</span>
@@ -267,19 +254,19 @@ export function UsersManagementTable({
       </div>
 
       {/* Users Table */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-900/80 border-b border-zinc-800 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+            <thead className="bg-zinc-50/80 border-b border-zinc-200 text-[11px] font-bold uppercase tracking-wider text-zinc-600">
               <tr>
-                <th className="py-3 px-4">User Details</th>
-                <th className="py-3 px-4">Current Role</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4">Role Assignment</th>
-                <th className="py-3 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4">User Details</th>
+                <th className="py-3.5 px-4">Current Role</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4">Role Assignment</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y divide-zinc-100">
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-zinc-500">
@@ -291,9 +278,9 @@ export function UsersManagementTable({
                   const isSelf = u.id === currentUserId;
 
                   return (
-                    <tr key={u.id} className="hover:bg-zinc-900/30 transition-colors">
-                      <td className="py-3 px-4">
-                        <div className="font-bold text-white flex items-center gap-2">
+                    <tr key={u.id} className="hover:bg-zinc-50/70 transition-colors">
+                      <td className="py-3.5 px-4">
+                        <div className="font-bold text-zinc-900 flex items-center gap-2">
                           <span>{u.name || "No Name Provided"}</span>
                           {isSelf && (
                             <span className="text-[10px] text-zinc-500 font-mono font-normal">
@@ -301,44 +288,44 @@ export function UsersManagementTable({
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-zinc-400 font-mono">
+                        <div className="text-[11px] text-zinc-500 font-mono">
                           {u.email}
                         </div>
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         {u.role === Role.ADMIN ? (
-                          <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-[10px]">
+                          <Badge className="bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-bold">
                             ADMIN
                           </Badge>
                         ) : u.role === Role.STAFF ? (
-                          <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-[10px]">
+                          <Badge className="bg-blue-50 text-blue-800 border-blue-200 text-[10px] font-bold">
                             STAFF
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="text-[10px] text-zinc-400 border-zinc-700">
+                          <Badge variant="outline" className="text-[10px] text-zinc-600 border-zinc-200 bg-zinc-50 font-medium">
                             CUSTOMER
                           </Badge>
                         )}
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         {u.isActive ? (
-                          <span className="inline-flex items-center gap-1.5 text-emerald-400 font-medium text-[11px]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          <span className="inline-flex items-center gap-1.5 text-emerald-700 font-bold text-[11px]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
                             Active
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-rose-400 font-medium text-[11px]">
-                            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                          <span className="inline-flex items-center gap-1.5 text-rose-700 font-bold text-[11px]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-600" />
                             Deactivated
                           </span>
                         )}
                       </td>
 
-                      <td className="py-3 px-4">
+                      <td className="py-3.5 px-4">
                         {isSelf ? (
-                          <span className="text-[11px] text-zinc-500 italic">
+                          <span className="text-[11px] text-zinc-400 italic">
                             Cannot change own role
                           </span>
                         ) : (
@@ -348,7 +335,7 @@ export function UsersManagementTable({
                             onChange={(e) =>
                               handleRoleChange(u.id, e.target.value as Role)
                             }
-                            className="h-8 rounded-lg border border-zinc-800 bg-zinc-900 px-2 text-xs text-zinc-200 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 cursor-pointer disabled:opacity-50"
+                            className="h-8 rounded-lg border border-zinc-300 bg-white px-2 text-xs text-zinc-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 cursor-pointer disabled:opacity-50 shadow-2xs font-medium"
                           >
                             <option value="CUSTOMER">Customer</option>
                             <option value="STAFF">Staff</option>
@@ -357,9 +344,9 @@ export function UsersManagementTable({
                         )}
                       </td>
 
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3.5 px-4 text-right">
                         {isSelf ? (
-                          <span className="text-[11px] text-zinc-500 italic">
+                          <span className="text-[11px] text-zinc-400 italic">
                             Self-protected
                           </span>
                         ) : (
@@ -368,20 +355,20 @@ export function UsersManagementTable({
                             variant={u.isActive ? "outline" : "default"}
                             disabled={isPending}
                             onClick={() => handleToggleActive(u.id, u.isActive)}
-                            className={`h-8 text-[11px] font-semibold cursor-pointer ${
+                            className={`h-8 text-[11px] font-bold cursor-pointer shadow-2xs ${
                               u.isActive
-                                ? "border-zinc-800 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30"
-                                : "bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border border-emerald-500/30"
+                                ? "border-zinc-200 bg-white text-zinc-700 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-200"
+                                : "bg-emerald-600 text-white hover:bg-emerald-700"
                             }`}
                           >
                             {u.isActive ? (
                               <>
-                                <UserX className="h-3.5 w-3.5 mr-1 text-rose-400" />
+                                <UserX className="h-3.5 w-3.5 mr-1 text-rose-600" />
                                 Deactivate
                               </>
                             ) : (
                               <>
-                                <UserCheck className="h-3.5 w-3.5 mr-1 text-emerald-400" />
+                                <UserCheck className="h-3.5 w-3.5 mr-1" />
                                 Reactivate
                               </>
                             )}
@@ -399,52 +386,52 @@ export function UsersManagementTable({
 
       {/* Add Staff / Admin Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
-          <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 text-zinc-900">
+            <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
               <div className="flex items-center gap-2">
                 <UserPlus className="h-4 w-4 text-amber-500" />
-                <h3 className="font-bold text-sm text-white">
+                <h3 className="font-bold text-sm text-zinc-900">
                   Add Store Staff / Admin
                 </h3>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-zinc-500 hover:text-white text-sm cursor-pointer"
+                className="text-zinc-400 hover:text-zinc-700 text-base font-bold cursor-pointer"
               >
                 &times;
               </button>
             </div>
 
             {addError && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 font-medium">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
                 <span>{addError}</span>
               </div>
             )}
 
             {addSuccess && (
-              <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-start gap-2">
-                <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2 font-medium">
+                <CheckCircle className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
                 <span>{addSuccess}</span>
               </div>
             )}
 
             {/* If Customer exists prompt */}
             {existingCustomerData ? (
-              <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-3 text-xs">
-                <div className="font-bold text-amber-400 flex items-center gap-1.5">
-                  <AlertCircle className="h-4 w-4" />
+              <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 space-y-3 text-xs">
+                <div className="font-bold text-amber-900 flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
                   Existing Customer Detected
                 </div>
-                <p className="text-zinc-300 leading-relaxed">
+                <p className="text-zinc-700 leading-relaxed">
                   <strong>{existingCustomerData.email}</strong> is already registered as a Customer. Would you like to promote this account to <strong>{addRole}</strong>?
                 </p>
                 <div className="flex items-center gap-2 pt-1">
                   <Button
                     onClick={handlePromoteExisting}
                     disabled={isPending}
-                    className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 cursor-pointer"
+                    className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 cursor-pointer shadow-xs"
                   >
                     {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
                     Yes, Promote to {addRole}
@@ -453,7 +440,7 @@ export function UsersManagementTable({
                     variant="outline"
                     onClick={() => setExistingCustomerData(null)}
                     disabled={isPending}
-                    className="h-9 text-xs border-zinc-800"
+                    className="h-9 text-xs border-zinc-200 font-semibold"
                   >
                     Cancel
                   </Button>
@@ -462,7 +449,7 @@ export function UsersManagementTable({
             ) : (
               <form onSubmit={handleCreateStaff} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
                     Full Name *
                   </label>
                   <Input
@@ -470,12 +457,12 @@ export function UsersManagementTable({
                     value={addName}
                     onChange={(e) => setAddName(e.target.value)}
                     placeholder="e.g. Maria Santos"
-                    className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white"
+                    className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
                     Email Address *
                   </label>
                   <Input
@@ -484,18 +471,18 @@ export function UsersManagementTable({
                     value={addEmail}
                     onChange={(e) => setAddEmail(e.target.value)}
                     placeholder="staff@rarefinds.ph"
-                    className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white"
+                    className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
                     Account Role *
                   </label>
                   <select
                     value={addRole}
                     onChange={(e) => setAddRole(e.target.value as "STAFF" | "ADMIN")}
-                    className="w-full h-10 rounded-xl border border-zinc-800 bg-zinc-900 px-3 text-xs text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500"
+                    className="w-full h-10 rounded-xl border border-zinc-300 bg-white px-3 text-xs text-zinc-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-medium"
                   >
                     <option value="STAFF">STAFF (Fulfill Orders &amp; Update Stock)</option>
                     <option value="ADMIN">ADMIN (Full Platform Privileges)</option>
@@ -503,7 +490,7 @@ export function UsersManagementTable({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
                     Temporary Password *
                   </label>
                   <Input
@@ -512,27 +499,27 @@ export function UsersManagementTable({
                     value={addPassword}
                     onChange={(e) => setAddPassword(e.target.value)}
                     placeholder="Min 8 chars, uppercase, lowercase, number, symbol"
-                    className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white"
+                    className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
                   />
                   <p className="text-[10px] text-zinc-500">
                     Must contain at least 8 characters with upper, lower, number, and special symbol.
                   </p>
                 </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-800/80">
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => setIsAddModalOpen(false)}
                     disabled={isPending}
-                    className="h-9 text-xs border-zinc-800 text-zinc-400"
+                    className="h-9 text-xs border-zinc-200 text-zinc-700 font-semibold"
                   >
                     Cancel
                   </Button>
                   <Button
                     type="submit"
                     disabled={isPending}
-                    className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 cursor-pointer gap-1.5"
+                    className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 cursor-pointer gap-1.5 shadow-xs"
                   >
                     {isPending ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

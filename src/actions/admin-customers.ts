@@ -9,6 +9,7 @@ export interface SerializedCustomerOrder {
   orderNumber: string;
   status: string;
   totalAmount: number;
+  isSimulated: boolean;
   createdAt: string;
 }
 
@@ -109,6 +110,7 @@ export async function getAdminCustomersAction(params: GetAdminCustomersParams = 
           orderNumber: true,
           status: true,
           totalAmount: true,
+          isSimulated: true,
           createdAt: true,
         },
         orderBy: { createdAt: "desc" },
@@ -131,7 +133,9 @@ export async function getAdminCustomersAction(params: GetAdminCustomersParams = 
   // Map and calculate metrics for each customer
   const serializedCustomers: SerializedAdminCustomer[] = users.map((u) => {
     const totalOrders = u.orders.length;
-    const totalSpent = u.orders.reduce((sum, ord) => sum + Number(ord.totalAmount), 0);
+    // Exclude simulated orders from real spending totals and tier calculation
+    const realOrders = u.orders.filter((ord) => !ord.isSimulated);
+    const totalSpent = realOrders.reduce((sum, ord) => sum + Number(ord.totalAmount), 0);
     const lastOrderDate = u.orders.length > 0 ? u.orders[0].createdAt.toISOString() : null;
 
     return {
@@ -159,6 +163,7 @@ export async function getAdminCustomersAction(params: GetAdminCustomersParams = 
         orderNumber: o.orderNumber,
         status: o.status,
         totalAmount: Number(o.totalAmount),
+        isSimulated: o.isSimulated,
         createdAt: o.createdAt.toISOString(),
       })),
     };
@@ -183,12 +188,13 @@ export async function getAdminCustomersAction(params: GetAdminCustomersParams = 
     where: { role: "CUSTOMER", isActive: true },
   });
 
-  // Calculate repeat buyers (customers with >= 2 non-cancelled orders)
+  // Calculate repeat buyers (customers with >= 2 non-cancelled real orders)
   const usersWithOrderCounts = await prisma.order.groupBy({
     by: ["userId"],
     where: {
       userId: { not: null },
       status: { not: "CANCELLED" },
+      isSimulated: false,
     },
     _count: { id: true },
     having: {
@@ -196,9 +202,12 @@ export async function getAdminCustomersAction(params: GetAdminCustomersParams = 
     },
   });
 
-  // Total LTV
+  // Total LTV (strictly excluding simulated demo transactions)
   const ltvAggregate = await prisma.order.aggregate({
-    where: { status: { not: "CANCELLED" } },
+    where: {
+      status: { not: "CANCELLED" },
+      isSimulated: false,
+    },
     _sum: { totalAmount: true },
   });
 
