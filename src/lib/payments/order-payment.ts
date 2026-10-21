@@ -8,7 +8,8 @@ import { OrderStatus, PaymentStatus, PaymentMethod } from "@prisma/client";
  */
 export async function completeOrderPayment(
   orderId: string,
-  paymentReference?: string
+  paymentReference?: string,
+  isSimulated?: boolean
 ): Promise<{ success: boolean; message?: string; error?: string; orderNumber?: string }> {
   return prisma.$transaction(async (tx) => {
     const order = await tx.order.findUnique({
@@ -26,7 +27,7 @@ export async function completeOrderPayment(
       return { success: false, error: "Order not found." };
     }
 
-    // Idempotency: If already paid, return success immediately
+    // Idempotency: If already paid, return success immediately without double-processing
     if (order.paymentStatus === PaymentStatus.PAID) {
       return {
         success: true,
@@ -62,7 +63,7 @@ export async function completeOrderPayment(
         } else {
           // Standard multi-quantity sneaker:
           // If the order was COD, stock was already decremented upon order placement.
-          // For non-COD (TEST/PayMongo), decrement stock now upon confirmed payment.
+          // For non-COD (GCASH, MAYA, CARD, TEST), decrement stock now upon confirmed payment.
           const shouldDecrement = order.paymentMethod !== PaymentMethod.COD;
 
           await tx.productVariant.update({
@@ -79,6 +80,11 @@ export async function completeOrderPayment(
       }
     }
 
+    const markSimulated =
+      isSimulated !== undefined
+        ? isSimulated
+        : order.isSimulated || order.paymentMethod !== PaymentMethod.COD;
+
     // Update order status and payment details
     const updatedOrder = await tx.order.update({
       where: { id: orderId },
@@ -86,10 +92,11 @@ export async function completeOrderPayment(
         status: OrderStatus.PAID,
         paymentStatus: PaymentStatus.PAID,
         paidAt: new Date(),
+        isSimulated: markSimulated,
         paymentReference:
           paymentReference ||
           order.paymentReference ||
-          `SIMULATED-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          `DEMO-${order.paymentMethod}-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`,
       },
     });
 
@@ -130,11 +137,13 @@ export async function cancelCustomerOrder(
       return { success: false, error: "You are not authorized to cancel this order." };
     }
 
-    // Only allow cancelling unpaid orders
-    if (
-      order.status !== OrderStatus.PENDING_PAYMENT &&
-      order.status !== OrderStatus.PENDING
-    ) {
+    // Only allow cancelling unpaid orders or simulated demo paid orders
+    const canCancel =
+      order.status === OrderStatus.PENDING_PAYMENT ||
+      order.status === OrderStatus.PENDING ||
+      (order.isSimulated && order.status === OrderStatus.PAID);
+
+    if (!canCancel) {
       return {
         success: false,
         error: `Cannot cancel an order in ${order.status} status.`,
@@ -146,8 +155,11 @@ export async function cancelCustomerOrder(
       if (item.variantId && item.variant) {
         const v = item.variant;
 
-        if (order.paymentMethod === PaymentMethod.COD) {
-          // COD previously marked 1-of-1 isSold=true or decremented stockQty on placement
+        if (
+          order.paymentMethod === PaymentMethod.COD ||
+          (order.isSimulated && order.status === OrderStatus.PAID)
+        ) {
+          // COD or PAID demo order previously marked 1-of-1 isSold=true or decremented stockQty
           if (v.isOneOfOne) {
             await tx.productVariant.update({
               where: { id: v.id },

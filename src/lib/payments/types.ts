@@ -21,5 +21,8 @@ export interface PaymentResult {
 export interface PaymentProvider {
   method: PaymentMethod;
   createPayment(order: CreatePaymentParams): Promise<PaymentResult>;
-  markPaid(orderId: string, paymentReference?: string): Promise<{ success: boolean; error?: string }>;
+  markPaid(
+    orderId: string,
+    paymentReference?: string
+  ): Promise<{ success: boolean; error?: string; message?: string; orderNumber?: string }>;
 }
