@@ -29,7 +29,7 @@ export default async function AdminLayout({
   const storeSettings = await getStoreSettings();
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex">
+    <div className="min-h-screen bg-slate-50 text-zinc-900 flex">
       {/* Role-aware dynamic sidebar */}
       <AdminSidebar
         userRole={user.role}
@@ -39,7 +39,7 @@ export default async function AdminLayout({
       />
 
       {/* Admin content viewport */}
-      <main className="flex-1 min-w-0 bg-zinc-900/40 min-h-screen overflow-y-auto">
+      <main className="flex-1 min-w-0 bg-slate-50 min-h-screen overflow-y-auto text-zinc-900">
         {children}
       </main>
     </div>

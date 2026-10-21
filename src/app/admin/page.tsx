@@ -28,6 +28,7 @@ export default async function AdminDashboardPage() {
     lowStockCount,
     totalProductsCount,
     todayOrdersCount,
+    todaySimulatedOrdersCount,
     recentOrders,
   ] = await Promise.all([
     prisma.order.count({
@@ -49,6 +50,13 @@ export default async function AdminDashboardPage() {
     prisma.order.count({
       where: {
         createdAt: { gte: startOfToday },
+        isSimulated: false,
+      },
+    }),
+    prisma.order.count({
+      where: {
+        createdAt: { gte: startOfToday },
+        isSimulated: true,
       },
     }),
     prisma.order.findMany({
@@ -62,6 +70,7 @@ export default async function AdminDashboardPage() {
         totalAmount: true,
         status: true,
         paymentMethod: true,
+        isSimulated: true,
         createdAt: true,
       },
     }),
@@ -70,31 +79,31 @@ export default async function AdminDashboardPage() {
   return (
     <div className="p-6 sm:p-10 space-y-8 max-w-7xl mx-auto">
       {/* Top Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 pb-6">
         <div>
           <div className="flex items-center gap-2.5">
-            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white">
+            <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-zinc-900">
               Store Command Center
             </h1>
             {user.role === Role.ADMIN ? (
-              <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs font-bold uppercase">
+              <Badge className="bg-amber-500/15 text-amber-800 border-amber-500/30 text-xs font-bold uppercase">
                 ADMIN ACCESS
               </Badge>
             ) : (
-              <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs font-bold uppercase">
+              <Badge className="bg-blue-500/15 text-blue-800 border-blue-500/30 text-xs font-bold uppercase">
                 STAFF ACCESS
               </Badge>
             )}
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            Welcome back, <strong className="text-white">{user.name || user.email}</strong>. Live single-store operations overview.
+          <p className="text-xs text-zinc-600 mt-1">
+            Welcome back, <strong className="text-zinc-900">{user.name || user.email}</strong>. Live single-store operations overview.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Link
             href="/"
-            className="text-xs font-semibold px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors inline-flex items-center gap-1.5"
+            className="text-xs font-semibold px-4 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-700 border border-zinc-200 shadow-xs transition-colors inline-flex items-center gap-1.5"
           >
             <span>View Public Store</span>
             <ArrowRight className="h-3.5 w-3.5" />
@@ -105,58 +114,60 @@ export default async function AdminDashboardPage() {
       {/* KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat 1: Pending Orders */}
-        <Card className="bg-zinc-900 border-zinc-800 text-white shadow-none">
+        <Card className="bg-white border-zinc-200 text-zinc-900 shadow-xs">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+            <CardTitle className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
               <span>Pending Orders</span>
               <Clock className="h-4 w-4 text-amber-500" />
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-3xl font-black text-white">{pendingOrdersCount}</div>
-            <p className="text-[11px] text-zinc-400 mt-1">Awaiting fulfillment / payment</p>
+            <div className="text-3xl font-black text-zinc-900">{pendingOrdersCount}</div>
+            <p className="text-[11px] text-zinc-500 mt-1">Awaiting fulfillment / payment</p>
           </CardContent>
         </Card>
 
         {/* Stat 2: Low Stock */}
-        <Card className="bg-zinc-900 border-zinc-800 text-white shadow-none">
+        <Card className="bg-white border-zinc-200 text-zinc-900 shadow-xs">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+            <CardTitle className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
               <span>Low Stock Alerts</span>
               <AlertTriangle className="h-4 w-4 text-rose-500" />
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-3xl font-black text-white">{lowStockCount}</div>
-            <p className="text-[11px] text-zinc-400 mt-1">Pairs with &le; 1 pair left in vault</p>
+            <div className="text-3xl font-black text-zinc-900">{lowStockCount}</div>
+            <p className="text-[11px] text-zinc-500 mt-1">Pairs with &le; 1 pair left in vault</p>
           </CardContent>
         </Card>
 
         {/* Stat 3: Total Products */}
-        <Card className="bg-zinc-900 border-zinc-800 text-white shadow-none">
+        <Card className="bg-white border-zinc-200 text-zinc-900 shadow-xs">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+            <CardTitle className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
               <span>Total Active Pairs</span>
               <Package className="h-4 w-4 text-sky-500" />
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-3xl font-black text-white">{totalProductsCount}</div>
-            <p className="text-[11px] text-zinc-400 mt-1">Active sneaker listings</p>
+            <div className="text-3xl font-black text-zinc-900">{totalProductsCount}</div>
+            <p className="text-[11px] text-zinc-500 mt-1">Active sneaker listings</p>
           </CardContent>
         </Card>
 
         {/* Stat 4: Today's Orders */}
-        <Card className="bg-zinc-900 border-zinc-800 text-white shadow-none">
+        <Card className="bg-white border-zinc-200 text-zinc-900 shadow-xs">
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-xs font-semibold text-zinc-400 uppercase tracking-wider flex items-center justify-between">
+            <CardTitle className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center justify-between">
               <span>Today&apos;s Orders</span>
               <Calendar className="h-4 w-4 text-emerald-500" />
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <div className="text-3xl font-black text-white">{todayOrdersCount}</div>
-            <p className="text-[11px] text-zinc-400 mt-1">Orders placed since 00:00</p>
+            <div className="text-3xl font-black text-zinc-900">{todayOrdersCount}</div>
+            <p className="text-[11px] text-zinc-500 mt-1">
+              Real orders placed today {todaySimulatedOrdersCount > 0 && `(+${todaySimulatedOrdersCount} demo)`}
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -165,14 +176,14 @@ export default async function AdminDashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link
           href="/admin/orders"
-          className="p-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900 transition-all group"
+          className="p-5 rounded-2xl border border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 shadow-xs transition-all group"
         >
           <div className="flex items-center justify-between mb-3">
             <ShoppingBag className="h-5 w-5 text-amber-500" />
-            <ArrowRight className="h-4 w-4 text-zinc-600 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+            <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-amber-500 group-hover:translate-x-1 transition-all" />
           </div>
-          <h3 className="text-sm font-bold text-white">Order Management</h3>
-          <p className="text-xs text-zinc-400 mt-1">
+          <h3 className="text-sm font-bold text-zinc-900">Order Management</h3>
+          <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
             Fulfill pending customer orders, confirm COD allocations, and inspect tracking.
           </p>
         </Link>
@@ -180,14 +191,14 @@ export default async function AdminDashboardPage() {
         {user.role === Role.ADMIN && (
           <Link
             href="/admin/users"
-            className="p-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900 transition-all group"
+            className="p-5 rounded-2xl border border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 shadow-xs transition-all group"
           >
             <div className="flex items-center justify-between mb-3">
-              <Users className="h-5 w-5 text-purple-400" />
-              <ArrowRight className="h-4 w-4 text-zinc-600 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+              <Users className="h-5 w-5 text-purple-500" />
+              <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-purple-500 group-hover:translate-x-1 transition-all" />
             </div>
-            <h3 className="text-sm font-bold text-white">Staff &amp; User Controls</h3>
-            <p className="text-xs text-zinc-400 mt-1">
+            <h3 className="text-sm font-bold text-zinc-900">Staff &amp; User Controls</h3>
+            <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
               Add staff accounts, promote registered customers, and manage access deactivations.
             </p>
           </Link>
@@ -196,14 +207,14 @@ export default async function AdminDashboardPage() {
         {user.role === Role.ADMIN && (
           <Link
             href="/admin/settings"
-            className="p-5 rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 hover:bg-zinc-900 transition-all group"
+            className="p-5 rounded-2xl border border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50/80 shadow-xs transition-all group"
           >
             <div className="flex items-center justify-between mb-3">
-              <Settings className="h-5 w-5 text-emerald-400" />
-              <ArrowRight className="h-4 w-4 text-zinc-600 group-hover:text-emerald-400 group-hover:translate-x-1 transition-all" />
+              <Settings className="h-5 w-5 text-emerald-500" />
+              <ArrowRight className="h-4 w-4 text-zinc-400 group-hover:text-emerald-500 group-hover:translate-x-1 transition-all" />
             </div>
-            <h3 className="text-sm font-bold text-white">Store Configuration</h3>
-            <p className="text-xs text-zinc-400 mt-1">
+            <h3 className="text-sm font-bold text-zinc-900">Store Configuration</h3>
+            <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
               Customize store branding, address, support contact, and base shipping fees.
             </p>
           </Link>
@@ -211,30 +222,30 @@ export default async function AdminDashboardPage() {
       </div>
 
       {/* Recent Orders Overview */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-4">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4 shadow-xs">
+        <div className="flex items-center justify-between border-b border-zinc-100 pb-4">
           <div>
-            <h2 className="text-sm font-bold uppercase tracking-wider text-white">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-zinc-900">
               Recent Vault Orders
             </h2>
-            <p className="text-xs text-zinc-400">
+            <p className="text-xs text-zinc-500">
               Latest transactions placed across the platform
             </p>
           </div>
           <Link
             href="/admin/orders"
-            className="text-xs text-amber-400 hover:underline font-semibold"
+            className="text-xs text-amber-600 hover:underline font-semibold"
           >
             View All Orders &rarr;
           </Link>
         </div>
 
         {recentOrders.length === 0 ? (
-          <div className="py-12 text-center text-xs text-zinc-500">
+          <div className="py-12 text-center text-xs text-zinc-400">
             No orders placed yet.
           </div>
         ) : (
-          <div className="divide-y divide-zinc-800/60">
+          <div className="divide-y divide-zinc-100">
             {recentOrders.map((ord) => (
               <div
                 key={ord.id}
@@ -242,22 +253,27 @@ export default async function AdminDashboardPage() {
               >
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono font-bold text-white">
+                    <span className="font-mono font-bold text-zinc-900">
                       {ord.orderNumber}
                     </span>
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 border-zinc-200 text-zinc-700">
                       {ord.status}
                     </Badge>
+                    {ord.isSimulated && (
+                      <Badge variant="outline" className="border-amber-500/50 text-amber-600 bg-amber-500/10 text-[9px] font-mono uppercase">
+                        DEMO
+                      </Badge>
+                    )}
                   </div>
-                  <p className="text-zinc-400 text-[11px]">
-                    Buyer: <span className="text-zinc-200">{ord.customerName}</span> ({ord.customerEmail})
+                  <p className="text-zinc-500 text-[11px]">
+                    Buyer: <span className="text-zinc-800 font-medium">{ord.customerName}</span> ({ord.customerEmail})
                   </p>
                 </div>
                 <div className="sm:text-right">
-                  <div className="font-mono font-bold text-white">
+                  <div className="font-mono font-bold text-zinc-900">
                     ₱{Number(ord.totalAmount).toLocaleString()}
                   </div>
-                  <p className="text-[10px] text-zinc-500 font-mono">
+                  <p className="text-[10px] text-zinc-400 font-mono">
                     {new Date(ord.createdAt).toLocaleDateString()} via {ord.paymentMethod}
                   </p>
                 </div>
