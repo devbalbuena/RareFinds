@@ -40,59 +40,62 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
   const getActionBadgeColor = (action: string) => {
     switch (action) {
       case "USER_CREATED":
-        return "bg-blue-500/20 text-blue-400 border-blue-500/30";
+        return "bg-blue-50 text-blue-800 border-blue-200";
       case "ROLE_CHANGE":
-        return "bg-purple-500/20 text-purple-400 border-purple-500/30";
+        return "bg-purple-50 text-purple-800 border-purple-200";
       case "USER_DEACTIVATED":
-        return "bg-rose-500/20 text-rose-400 border-rose-500/30";
+        return "bg-rose-50 text-rose-800 border-rose-200";
       case "USER_ACTIVATED":
-        return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+        return "bg-emerald-50 text-emerald-800 border-emerald-200";
       case "SETTINGS_UPDATED":
-        return "bg-amber-500/20 text-amber-400 border-amber-500/30";
+        return "bg-amber-50 text-amber-800 border-amber-200";
+      case "ORDER_STATUS_UPDATED":
+      case "ORDER_DISPATCHED":
+        return "bg-indigo-50 text-indigo-800 border-indigo-200";
       default:
-        return "bg-zinc-800 text-zinc-300 border-zinc-700";
+        return "bg-zinc-100 text-zinc-700 border-zinc-200";
     }
   };
 
   return (
-    <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-6">
+    <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-6 text-zinc-900">
       <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/admin" className="hover:text-white flex items-center gap-1">
+        <Link href="/admin" className="hover:text-zinc-900 flex items-center gap-1 font-semibold">
           <ArrowLeft className="h-3 w-3" /> Dashboard
         </Link>
         <span>/</span>
-        <span className="text-zinc-300">Audit Trail</span>
+        <span className="text-zinc-700 font-medium">Audit Trail</span>
       </div>
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 pb-4">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2.5">
-            <FileText className="h-6 w-6 text-amber-400" />
+          <h1 className="text-2xl font-black uppercase tracking-tight text-zinc-900 flex items-center gap-2.5">
+            <FileText className="h-6 w-6 text-amber-500" />
             Security &amp; Administrative Audit Trail
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
-            Immutable log of role changes, staff creations, account deactivations, and configuration updates.
+          <p className="text-xs text-zinc-500 mt-1">
+            Immutable log of role changes, staff creations, order updates, account deactivations, and configuration updates.
           </p>
         </div>
-        <div className="text-xs font-mono text-zinc-400">
-          Total Recorded Actions: <strong className="text-white">{totalCount}</strong>
+        <div className="text-xs font-mono text-zinc-500">
+          Total Recorded Actions: <strong className="text-zinc-900">{totalCount}</strong>
         </div>
       </div>
 
       {/* Read-only Paginated Table */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden">
+      <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-zinc-900/80 border-b border-zinc-800 text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+            <thead className="bg-zinc-50/80 border-b border-zinc-200 text-[11px] font-bold uppercase tracking-wider text-zinc-600">
               <tr>
-                <th className="py-3 px-4">Timestamp</th>
-                <th className="py-3 px-4">Operator</th>
-                <th className="py-3 px-4">Action</th>
-                <th className="py-3 px-4">Target Entity</th>
-                <th className="py-3 px-4">Change Summary</th>
+                <th className="py-3.5 px-4">Timestamp</th>
+                <th className="py-3.5 px-4">Operator</th>
+                <th className="py-3.5 px-4">Action</th>
+                <th className="py-3.5 px-4">Target Entity</th>
+                <th className="py-3.5 px-4">Change Summary</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60 font-mono text-[11px]">
+            <tbody className="divide-y divide-zinc-100 font-mono text-[11px]">
               {logs.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-zinc-500 font-sans text-xs">
@@ -111,13 +114,13 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
                   });
 
                   return (
-                    <tr key={log.id} className="hover:bg-zinc-900/30 transition-colors">
-                      <td className="py-3 px-4 whitespace-nowrap text-zinc-400">
+                    <tr key={log.id} className="hover:bg-zinc-50/70 transition-colors">
+                      <td className="py-3 px-4 whitespace-nowrap text-zinc-500">
                         {dateFormatted}
                       </td>
 
                       <td className="py-3 px-4">
-                        <div className="text-white font-sans font-semibold">
+                        <div className="text-zinc-900 font-sans font-bold">
                           {log.user?.name || log.userEmail}
                         </div>
                         <div className="text-zinc-500 text-[10px]">
@@ -136,22 +139,22 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
                         </Badge>
                       </td>
 
-                      <td className="py-3 px-4 text-zinc-300">
-                        <span className="text-amber-400">{log.entityType}</span>
+                      <td className="py-3 px-4 text-zinc-800">
+                        <span className="font-bold text-amber-700">{log.entityType}</span>
                         {log.entityId && (
-                          <span className="text-zinc-500 text-[10px] block truncate max-w-[120px]">
+                          <span className="text-zinc-400 text-[10px] block truncate max-w-[120px]">
                             {log.entityId}
                           </span>
                         )}
                       </td>
 
-                      <td className="py-3 px-4 max-w-xs truncate text-zinc-300 font-mono text-[10px]">
+                      <td className="py-3 px-4 max-w-xs truncate text-zinc-700 font-mono text-[10px]">
                         {log.details ? (
                           <span title={JSON.stringify(log.details, null, 2)}>
                             {JSON.stringify(log.details)}
                           </span>
                         ) : (
-                          <span className="text-zinc-600">—</span>
+                          <span className="text-zinc-400">—</span>
                         )}
                       </td>
                     </tr>
@@ -164,10 +167,10 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
 
         {/* Pagination Controls */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-zinc-800 flex items-center justify-between text-xs text-zinc-400">
+          <div className="p-4 border-t border-zinc-200 bg-zinc-50/60 flex items-center justify-between text-xs text-zinc-600">
             <div>
-              Page <strong className="text-white">{currentPage}</strong> of{" "}
-              <strong className="text-white">{totalPages}</strong>
+              Page <strong className="text-zinc-900">{currentPage}</strong> of{" "}
+              <strong className="text-zinc-900">{totalPages}</strong>
             </div>
 
             <div className="flex items-center gap-2">
@@ -176,7 +179,7 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
                 size="sm"
                 asChild
                 disabled={currentPage <= 1}
-                className="h-8 border-zinc-800 text-xs gap-1"
+                className="h-8 border-zinc-200 bg-white text-zinc-700 text-xs gap-1 shadow-2xs"
               >
                 <Link
                   href={`/admin/audit?page=${currentPage - 1}`}
@@ -192,7 +195,7 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
                 size="sm"
                 asChild
                 disabled={currentPage >= totalPages}
-                className="h-8 border-zinc-800 text-xs gap-1"
+                className="h-8 border-zinc-200 bg-white text-zinc-700 text-xs gap-1 shadow-2xs"
               >
                 <Link
                   href={`/admin/audit?page=${currentPage + 1}`}

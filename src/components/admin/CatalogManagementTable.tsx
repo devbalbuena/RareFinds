@@ -86,43 +86,41 @@ export function CatalogManagementTable({
   const [catDesc, setCatDesc] = React.useState("");
   const [catLoading, setCatLoading] = React.useState(false);
 
-  // Delete State
+  // Deletion loader
   const [deletingId, setDeletingId] = React.useState<string | null>(null);
 
-  // Open Brand Modal
+  // Open Create Brand
   const openCreateBrand = () => {
     setEditingBrand(null);
     setBrandName("");
     setBrandDesc("");
     setBrandLogo("");
     setIsBrandModalOpen(true);
-    setAlert(null);
   };
 
-  const openEditBrand = (b: BrandItem) => {
-    setEditingBrand(b);
-    setBrandName(b.name);
-    setBrandDesc(b.description || "");
-    setBrandLogo(b.logoUrl || "");
+  // Open Edit Brand
+  const openEditBrand = (brand: BrandItem) => {
+    setEditingBrand(brand);
+    setBrandName(brand.name);
+    setBrandDesc(brand.description || "");
+    setBrandLogo(brand.logoUrl || "");
     setIsBrandModalOpen(true);
-    setAlert(null);
   };
 
-  // Open Category Modal
+  // Open Create Category
   const openCreateCategory = () => {
     setEditingCategory(null);
     setCatName("");
     setCatDesc("");
     setIsCategoryModalOpen(true);
-    setAlert(null);
   };
 
-  const openEditCategory = (c: CategoryItem) => {
-    setEditingCategory(c);
-    setCatName(c.name);
-    setCatDesc(c.description || "");
+  // Open Edit Category
+  const openEditCategory = (cat: CategoryItem) => {
+    setEditingCategory(cat);
+    setCatName(cat.name);
+    setCatDesc(cat.description || "");
     setIsCategoryModalOpen(true);
-    setAlert(null);
   };
 
   // Save Brand
@@ -304,33 +302,33 @@ export function CatalogManagementTable({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-zinc-900">
       {/* Alert Notice */}
       {alert && (
         <div
-          className={`flex items-center gap-2 rounded-xl p-4 text-xs font-medium border ${
+          className={`flex items-center gap-2 rounded-xl p-4 text-xs font-semibold border shadow-2xs ${
             alert.type === "success"
-              ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-              : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+              : "bg-rose-50 border-rose-200 text-rose-800"
           }`}
         >
           {alert.type === "success" ? (
-            <CheckCircle className="h-4 w-4 shrink-0" />
+            <CheckCircle className="h-4 w-4 shrink-0 text-emerald-600" />
           ) : (
-            <AlertTriangle className="h-4 w-4 shrink-0" />
+            <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
           )}
           <span>{alert.message}</span>
         </div>
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-6">
         <div>
-          <h1 className="text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+          <h1 className="text-2xl font-black uppercase tracking-tight text-zinc-900 flex items-center gap-2">
             <Tags className="h-6 w-6 text-amber-500" />
             Brands &amp; Categories
           </h1>
-          <p className="text-xs text-zinc-400 mt-1">
+          <p className="text-xs text-zinc-500 mt-1">
             Taxonomy configuration for sneaker vault classification and navigation filters.
           </p>
         </div>
@@ -339,7 +337,7 @@ export function CatalogManagementTable({
           <Button
             size="sm"
             onClick={activeTab === "brands" ? openCreateBrand : openCreateCategory}
-            className="bg-amber-500 hover:bg-amber-600 text-black font-bold flex items-center gap-1.5 self-start sm:self-auto shadow-lg shadow-amber-500/20"
+            className="bg-amber-500 hover:bg-amber-600 text-black font-bold flex items-center gap-1.5 self-start sm:self-auto shadow-xs"
           >
             <Plus className="h-4 w-4" />
             {activeTab === "brands" ? "Add New Brand" : "Add New Category"}
@@ -348,13 +346,13 @@ export function CatalogManagementTable({
       </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2 border-b border-zinc-800 pb-2">
+      <div className="flex items-center gap-2 border-b border-zinc-200 pb-2">
         <button
           onClick={() => setActiveTab("brands")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             activeTab === "brands"
-              ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
-              : "text-zinc-400 hover:text-white"
+              ? "bg-amber-500 text-black shadow-xs"
+              : "bg-white text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 border border-zinc-200 shadow-2xs"
           }`}
         >
           <Tags className="h-3.5 w-3.5" />
@@ -364,8 +362,8 @@ export function CatalogManagementTable({
           onClick={() => setActiveTab("categories")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
             activeTab === "categories"
-              ? "bg-amber-500/10 text-amber-400 border border-amber-500/30"
-              : "text-zinc-400 hover:text-white"
+              ? "bg-amber-500 text-black shadow-xs"
+              : "bg-white text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 border border-zinc-200 shadow-2xs"
           }`}
         >
           <FolderTree className="h-3.5 w-3.5" />
@@ -375,9 +373,9 @@ export function CatalogManagementTable({
 
       {/* Brands Table */}
       {activeTab === "brands" && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden shadow-xl">
+        <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-zinc-800 bg-zinc-950/70 text-zinc-400 uppercase tracking-wider text-[11px] font-semibold">
+            <thead className="border-b border-zinc-200 bg-zinc-50/80 text-zinc-600 uppercase tracking-wider text-[11px] font-bold">
               <tr>
                 <th className="py-3.5 px-4">Brand</th>
                 <th className="py-3.5 px-4">Slug</th>
@@ -386,7 +384,7 @@ export function CatalogManagementTable({
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y divide-zinc-100">
               {brands.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-zinc-500">
@@ -395,18 +393,18 @@ export function CatalogManagementTable({
                 </tr>
               ) : (
                 brands.map((brand) => (
-                  <tr key={brand.id} className="hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-white flex items-center gap-2">
+                  <tr key={brand.id} className="hover:bg-zinc-50/70 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-zinc-900 flex items-center gap-2">
                       <span>{brand.name}</span>
                     </td>
-                    <td className="py-3.5 px-4 text-zinc-400 font-mono text-[11px]">
+                    <td className="py-3.5 px-4 text-zinc-500 font-mono text-[11px]">
                       {brand.slug}
                     </td>
-                    <td className="py-3.5 px-4 text-zinc-400 max-w-xs truncate">
+                    <td className="py-3.5 px-4 text-zinc-600 max-w-xs truncate">
                       {brand.description || "—"}
                     </td>
                     <td className="py-3.5 px-4">
-                      <Badge className="bg-zinc-800 text-zinc-300 border-zinc-700 text-[10px]">
+                      <Badge className="bg-zinc-100 text-zinc-700 border-zinc-200 text-[10px] font-medium">
                         {brand._count.products} sneaker(s)
                       </Badge>
                     </td>
@@ -418,7 +416,7 @@ export function CatalogManagementTable({
                             size="sm"
                             onClick={() => openEditBrand(brand)}
                             title="Edit brand"
-                            className="h-7 px-2 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                            className="h-7 px-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
@@ -432,7 +430,7 @@ export function CatalogManagementTable({
                                 ? "Cannot delete brand while assigned to sneakers"
                                 : "Delete brand"
                             }
-                            className="h-7 px-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-30"
+                            className="h-7 px-2 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-30"
                           >
                             {deletingId === brand.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -442,7 +440,7 @@ export function CatalogManagementTable({
                           </Button>
                         </div>
                       ) : (
-                        <span className="text-[11px] text-zinc-600">Read only</span>
+                        <span className="text-[11px] text-zinc-400">Read only</span>
                       )}
                     </td>
                   </tr>
@@ -455,9 +453,9 @@ export function CatalogManagementTable({
 
       {/* Categories Table */}
       {activeTab === "categories" && (
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 overflow-hidden shadow-xl">
+        <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-zinc-800 bg-zinc-950/70 text-zinc-400 uppercase tracking-wider text-[11px] font-semibold">
+            <thead className="border-b border-zinc-200 bg-zinc-50/80 text-zinc-600 uppercase tracking-wider text-[11px] font-bold">
               <tr>
                 <th className="py-3.5 px-4">Category</th>
                 <th className="py-3.5 px-4">Slug</th>
@@ -466,7 +464,7 @@ export function CatalogManagementTable({
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-zinc-800/60">
+            <tbody className="divide-y divide-zinc-100">
               {categories.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-12 text-center text-zinc-500">
@@ -475,18 +473,18 @@ export function CatalogManagementTable({
                 </tr>
               ) : (
                 categories.map((cat) => (
-                  <tr key={cat.id} className="hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-white">
+                  <tr key={cat.id} className="hover:bg-zinc-50/70 transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-zinc-900">
                       {cat.name}
                     </td>
-                    <td className="py-3.5 px-4 text-zinc-400 font-mono text-[11px]">
+                    <td className="py-3.5 px-4 text-zinc-500 font-mono text-[11px]">
                       {cat.slug}
                     </td>
-                    <td className="py-3.5 px-4 text-zinc-400 max-w-xs truncate">
+                    <td className="py-3.5 px-4 text-zinc-600 max-w-xs truncate">
                       {cat.description || "—"}
                     </td>
                     <td className="py-3.5 px-4">
-                      <Badge className="bg-zinc-800 text-zinc-300 border-zinc-700 text-[10px]">
+                      <Badge className="bg-zinc-100 text-zinc-700 border-zinc-200 text-[10px] font-medium">
                         {cat._count.products} sneaker(s)
                       </Badge>
                     </td>
@@ -498,7 +496,7 @@ export function CatalogManagementTable({
                             size="sm"
                             onClick={() => openEditCategory(cat)}
                             title="Edit category"
-                            className="h-7 px-2 text-zinc-400 hover:text-white hover:bg-zinc-800"
+                            className="h-7 px-2 text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100"
                           >
                             <Edit className="h-3.5 w-3.5" />
                           </Button>
@@ -512,7 +510,7 @@ export function CatalogManagementTable({
                                 ? "Cannot delete category while assigned to sneakers"
                                 : "Delete category"
                             }
-                            className="h-7 px-2 text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 disabled:opacity-30"
+                            className="h-7 px-2 text-zinc-500 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-30"
                           >
                             {deletingId === cat.id ? (
                               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -522,7 +520,7 @@ export function CatalogManagementTable({
                           </Button>
                         </div>
                       ) : (
-                        <span className="text-[11px] text-zinc-600">Read only</span>
+                        <span className="text-[11px] text-zinc-400">Read only</span>
                       )}
                     </td>
                   </tr>
@@ -535,20 +533,20 @@ export function CatalogManagementTable({
 
       {/* Brand Add/Edit Modal */}
       <Dialog open={isBrandModalOpen} onOpenChange={setIsBrandModalOpen}>
-        <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800 text-white p-6">
+        <DialogContent className="sm:max-w-md bg-white border-zinc-200 text-zinc-900 p-6 shadow-2xl">
           <DialogHeader className="space-y-1">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-white">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-zinc-900">
               <Tags className="h-5 w-5 text-amber-500" />
               {editingBrand ? `Edit Brand (${editingBrand.name})` : "Create New Brand"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-zinc-500">
               Taxonomy entry for sneaker labels and manufacturer cataloging.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleBrandSubmit} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">
                 Brand Name *
               </label>
               <Input
@@ -556,24 +554,24 @@ export function CatalogManagementTable({
                 placeholder="e.g. Jordan, Nike, New Balance"
                 value={brandName}
                 onChange={(e) => setBrandName(e.target.value)}
-                className="bg-zinc-900 border-zinc-800 text-xs text-white"
+                className="bg-white border-zinc-300 text-xs text-zinc-900"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">
                 Description (Optional)
               </label>
               <Input
                 placeholder="Short bio or heritage overview"
                 value={brandDesc}
                 onChange={(e) => setBrandDesc(e.target.value)}
-                className="bg-zinc-900 border-zinc-800 text-xs text-white"
+                className="bg-white border-zinc-300 text-xs text-zinc-900"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">
                 Brand Logo URL (Optional)
               </label>
               <Input
@@ -581,7 +579,7 @@ export function CatalogManagementTable({
                 placeholder="https://example.com/logo.png"
                 value={brandLogo}
                 onChange={(e) => setBrandLogo(e.target.value)}
-                className="bg-zinc-900 border-zinc-800 text-xs text-white"
+                className="bg-white border-zinc-300 text-xs text-zinc-900"
               />
             </div>
 
@@ -591,7 +589,7 @@ export function CatalogManagementTable({
                 variant="outline"
                 size="sm"
                 onClick={() => setIsBrandModalOpen(false)}
-                className="border-zinc-800 text-zinc-400 hover:text-white"
+                className="border-zinc-200 text-zinc-700 hover:bg-zinc-100 font-semibold"
               >
                 Cancel
               </Button>
@@ -599,7 +597,7 @@ export function CatalogManagementTable({
                 type="submit"
                 size="sm"
                 disabled={brandLoading}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-bold"
+                className="bg-amber-500 hover:bg-amber-600 text-black font-bold shadow-xs"
               >
                 {brandLoading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                 {editingBrand ? "Save Changes" : "Create Brand"}
@@ -611,20 +609,20 @@ export function CatalogManagementTable({
 
       {/* Category Add/Edit Modal */}
       <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-        <DialogContent className="sm:max-w-md bg-zinc-950 border-zinc-800 text-white p-6">
+        <DialogContent className="sm:max-w-md bg-white border-zinc-200 text-zinc-900 p-6 shadow-2xl">
           <DialogHeader className="space-y-1">
-            <DialogTitle className="flex items-center gap-2 text-base font-bold text-white">
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-zinc-900">
               <FolderTree className="h-5 w-5 text-amber-500" />
               {editingCategory ? `Edit Category (${editingCategory.name})` : "Create New Category"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-zinc-400">
+            <DialogDescription className="text-xs text-zinc-500">
               Vault classification tier (e.g. Basketball, Running, Lifestyle).
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleCategorySubmit} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">
                 Category Name *
               </label>
               <Input
@@ -632,19 +630,19 @@ export function CatalogManagementTable({
                 placeholder="e.g. Basketball, Lifestyle, Skateboarding"
                 value={catName}
                 onChange={(e) => setCatName(e.target.value)}
-                className="bg-zinc-900 border-zinc-800 text-xs text-white"
+                className="bg-white border-zinc-300 text-xs text-zinc-900"
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              <label className="text-xs font-bold uppercase tracking-wider text-zinc-700">
                 Description (Optional)
               </label>
               <Input
                 placeholder="Classification notes"
                 value={catDesc}
                 onChange={(e) => setCatDesc(e.target.value)}
-                className="bg-zinc-900 border-zinc-800 text-xs text-white"
+                className="bg-white border-zinc-300 text-xs text-zinc-900"
               />
             </div>
 
@@ -654,7 +652,7 @@ export function CatalogManagementTable({
                 variant="outline"
                 size="sm"
                 onClick={() => setIsCategoryModalOpen(false)}
-                className="border-zinc-800 text-zinc-400 hover:text-white"
+                className="border-zinc-200 text-zinc-700 hover:bg-zinc-100 font-semibold"
               >
                 Cancel
               </Button>
@@ -662,7 +660,7 @@ export function CatalogManagementTable({
                 type="submit"
                 size="sm"
                 disabled={catLoading}
-                className="bg-amber-500 hover:bg-amber-600 text-black font-bold"
+                className="bg-amber-500 hover:bg-amber-600 text-black font-bold shadow-xs"
               >
                 {catLoading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
                 {editingCategory ? "Save Changes" : "Create Category"}

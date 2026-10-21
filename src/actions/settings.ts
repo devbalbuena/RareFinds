@@ -104,7 +104,13 @@ export async function updateStoreSettingsAction(input: UpdateSettingsInput) {
       // Graceful fallback in non-request test contexts
     }
 
-    return { success: true, settings: updated };
+    return {
+      success: true,
+      settings: {
+        ...updated,
+        shippingFee: Number(updated.shippingFee),
+      },
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to update store settings.";
     return { error: msg };

@@ -67,36 +67,36 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
+    <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl text-zinc-900">
       {alert && (
         <div
-          className={`p-4 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in ${
+          className={`p-4 rounded-xl border text-xs flex items-start gap-2.5 animate-in fade-in shadow-2xs font-medium ${
             alert.type === "error"
-              ? "bg-red-500/10 border-red-500/30 text-red-400"
-              : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              ? "bg-rose-50 border-rose-200 text-rose-800"
+              : "bg-emerald-50 border-emerald-200 text-emerald-800"
           }`}
         >
           {alert.type === "error" ? (
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-rose-600" />
           ) : (
-            <CheckCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <CheckCircle className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600" />
           )}
-          <span className="font-medium">{alert.message}</span>
+          <span>{alert.message}</span>
         </div>
       )}
 
       {/* Section 1: Store Identity */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
-        <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4 shadow-xs">
+        <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
           <Building className="h-4 w-4 text-amber-500" />
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-900">
             Store Identity &amp; Branding
           </h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5 sm:col-span-2">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Store Brand Name *
             </label>
             <Input
@@ -106,7 +106,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 setFormData({ ...formData, storeName: e.target.value })
               }
               placeholder="e.g. RareFinds"
-              className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
             />
             <p className="text-[10px] text-zinc-500">
               Appears in the header logo, footer copyright, and order confirmation documents.
@@ -114,7 +114,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
           </div>
 
           <div className="space-y-1.5 sm:col-span-2">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Brand Tagline
             </label>
             <Input
@@ -123,24 +123,24 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 setFormData({ ...formData, storeTagline: e.target.value })
               }
               placeholder="e.g. Rare & Limited Sneaker Vault"
-              className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
             />
           </div>
         </div>
       </div>
 
       {/* Section 2: Contact Information */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
-        <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
-          <Mail className="h-4 w-4 text-sky-400" />
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4 shadow-xs">
+        <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+          <Mail className="h-4 w-4 text-sky-600" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-900">
             Contact &amp; Customer Support
           </h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Official Contact Email *
             </label>
             <Input
@@ -151,12 +151,12 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 setFormData({ ...formData, contactEmail: e.target.value })
               }
               placeholder="contact@rarefinds.ph"
-              className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Contact Phone / Mobile *
             </label>
             <Input
@@ -166,12 +166,12 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 setFormData({ ...formData, contactPhone: e.target.value })
               }
               placeholder="+63 917 123 4567"
-              className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
             />
           </div>
 
           <div className="space-y-1.5 sm:col-span-2">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Physical / Dispatch Vault Address *
             </label>
             <Input
@@ -181,24 +181,24 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 setFormData({ ...formData, address: e.target.value })
               }
               placeholder="Manila, Philippines"
-              className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
             />
           </div>
         </div>
       </div>
 
       {/* Section 3: Currency & Shipping Fees */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 space-y-4">
-        <div className="flex items-center gap-2 border-b border-zinc-800 pb-3">
-          <Coins className="h-4 w-4 text-emerald-400" />
-          <h2 className="text-xs font-bold uppercase tracking-wider text-white">
+      <div className="rounded-2xl border border-zinc-200 bg-white p-6 space-y-4 shadow-xs">
+        <div className="flex items-center gap-2 border-b border-zinc-200 pb-3">
+          <Coins className="h-4 w-4 text-emerald-600" />
+          <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-900">
             Currency &amp; Base Shipping
           </h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Currency Code *
             </label>
             <Input
@@ -208,12 +208,12 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 setFormData({ ...formData, currency: e.target.value.toUpperCase() })
               }
               placeholder="PHP"
-              className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white font-mono"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900 font-mono"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Currency Symbol *
             </label>
             <Input
@@ -223,12 +223,12 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 setFormData({ ...formData, currencySymbol: e.target.value })
               }
               placeholder="₱"
-              className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white font-mono"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900 font-mono"
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400 block">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
               Standard Shipping Fee *
             </label>
             <Input
@@ -241,7 +241,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 setFormData({ ...formData, shippingFee: Number(e.target.value) })
               }
               placeholder="0 for Free Delivery"
-              className="h-10 text-xs bg-zinc-900 border-zinc-800 text-white font-mono"
+              className="h-10 text-xs bg-white border-zinc-300 text-zinc-900 font-mono"
             />
             <p className="text-[10px] text-zinc-500">
               Set to 0 for complimentary insured shipping.
@@ -254,7 +254,7 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
         <Button
           type="submit"
           disabled={isPending}
-          className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-10 px-6 gap-2 cursor-pointer shadow-lg shadow-amber-500/20"
+          className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-10 px-6 gap-2 cursor-pointer shadow-xs"
         >
           {isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
