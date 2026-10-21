@@ -7,6 +7,7 @@ import { CheckoutForm } from "@/components/checkout/CheckoutForm";
 import { ShoppingBag, ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getStoreSettings } from "@/lib/settings";
+import { getPaymentMode } from "@/lib/payments";
 
 export const metadata: Metadata = {
   title: "Secure Checkout | RareFinds Vault",
@@ -121,6 +122,7 @@ export default async function CheckoutPage() {
   );
 
   const settings = await getStoreSettings();
+  const paymentMode = getPaymentMode();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8">
@@ -153,6 +155,7 @@ export default async function CheckoutPage() {
         storeName={settings.storeName}
         userEmail={user?.email || session.user.email || ""}
         userName={user?.name || session.user.name || ""}
+        paymentMode={paymentMode}
       />
     </div>
   );

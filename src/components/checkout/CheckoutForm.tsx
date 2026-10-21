@@ -12,9 +12,10 @@ import {
   Loader2,
   Lock,
   Plus,
-  Clock,
   Globe,
   MapPin,
+  Sparkles,
+  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,7 @@ interface CheckoutFormProps {
   storeName?: string;
   userEmail: string;
   userName: string;
+  paymentMode?: "demo" | "cod_only" | "live";
 }
 
 export function CheckoutForm({
@@ -77,6 +79,7 @@ export function CheckoutForm({
   storeName = "RareFinds",
   userEmail,
   userName,
+  paymentMode = "demo",
 }: CheckoutFormProps) {
   const router = useRouter();
   const errorRef = React.useRef<HTMLDivElement>(null);
@@ -139,7 +142,10 @@ export function CheckoutForm({
   };
 
   // Payment method state
-  const [paymentMethod, setPaymentMethod] = React.useState<"TEST" | "COD">("TEST");
+  type AllowedPaymentMethod = "COD" | "GCASH" | "MAYA" | "CARD" | "TEST";
+  const [paymentMethod, setPaymentMethod] = React.useState<AllowedPaymentMethod>(
+    paymentMode === "demo" ? "GCASH" : "COD"
+  );
   const [orderNotes, setOrderNotes] = React.useState("");
 
   // Submission state
@@ -517,41 +523,21 @@ export function CheckoutForm({
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Option 1: TEST PAYMENT */}
-              <label
-                className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
-                  paymentMethod === "TEST"
-                    ? "border-amber-500 bg-amber-500/5 ring-1 ring-amber-500 shadow-xs"
-                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="TEST"
-                      checked={paymentMethod === "TEST"}
-                      onChange={() => setPaymentMethod("TEST")}
-                      className="h-4 w-4 text-amber-500 accent-amber-500"
-                    />
-                    <span className="font-bold text-xs uppercase tracking-wide text-foreground">
-                      Test Simulation
-                    </span>
-                  </div>
-                  <Badge variant="grail" className="text-[10px] px-1.5 py-0 h-4 gap-1">
-                    <Clock className="h-2.5 w-2.5" />
-                    15-Min Hold
-                  </Badge>
+            {/* Demo Mode Notice Banner */}
+            {paymentMode === "demo" && (
+              <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 flex items-center gap-3 text-xs mb-4">
+                <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
+                <div>
+                  <span className="font-bold uppercase tracking-wider block">Demo mode: no real payment will be made.</span>
+                  <span className="text-[11px] text-amber-400/80">
+                    GCash, Maya, and Card selections immediately simulate verified checkout and mark orders as paid.
+                  </span>
                 </div>
+              </div>
+            )}
 
-                <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-                  Instantly reserves your 1-of-1 pair for 15 minutes. Simulates checkout without a live credit card.
-                </p>
-              </label>
-
-              {/* Option 2: COD */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Option: COD (Always available) */}
               <label
                 className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
                   paymentMethod === "COD"
@@ -575,14 +561,121 @@ export function CheckoutForm({
                     </span>
                   </div>
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                    Instant Allocation
+                    Official Delivery
                   </Badge>
                 </div>
 
                 <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
-                  Pay cash upon personal courier inspection. Your pair is immediately allocated and marked sold.
+                  Pay cash upon courier inspection. Pair is allocated and processed for dispatch.
                 </p>
               </label>
+
+              {/* Demo Payment Methods (Shown when paymentMode === 'demo') */}
+              {paymentMode === "demo" && (
+                <>
+                  {/* GCash Demo */}
+                  <label
+                    className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                      paymentMethod === "GCASH"
+                        ? "border-blue-500 bg-blue-500/5 ring-1 ring-blue-500 shadow-xs"
+                        : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="GCASH"
+                          checked={paymentMethod === "GCASH"}
+                          onChange={() => setPaymentMethod("GCASH")}
+                          className="h-4 w-4 text-blue-500 accent-blue-500"
+                        />
+                        <span className="font-bold text-xs uppercase tracking-wide text-foreground flex items-center gap-1.5">
+                          <Smartphone className="h-3.5 w-3.5 text-blue-400" />
+                          GCash (Demo)
+                        </span>
+                      </div>
+                      <Badge variant="grail" className="text-[10px] px-1.5 py-0 h-4 gap-1">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        Instant Paid
+                      </Badge>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                      Simulated GCash payment. Instantly approved, vault holds cleared, and marked paid.
+                    </p>
+                  </label>
+
+                  {/* Maya Demo */}
+                  <label
+                    className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                      paymentMethod === "MAYA"
+                        ? "border-emerald-500 bg-emerald-500/5 ring-1 ring-emerald-500 shadow-xs"
+                        : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="MAYA"
+                          checked={paymentMethod === "MAYA"}
+                          onChange={() => setPaymentMethod("MAYA")}
+                          className="h-4 w-4 text-emerald-500 accent-emerald-500"
+                        />
+                        <span className="font-bold text-xs uppercase tracking-wide text-foreground flex items-center gap-1.5">
+                          <Smartphone className="h-3.5 w-3.5 text-emerald-400" />
+                          Maya (Demo)
+                        </span>
+                      </div>
+                      <Badge variant="grail" className="text-[10px] px-1.5 py-0 h-4 gap-1">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        Instant Paid
+                      </Badge>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                      Simulated Maya wallet checkout. Instantly approved and marked paid.
+                    </p>
+                  </label>
+
+                  {/* Card Demo */}
+                  <label
+                    className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
+                      paymentMethod === "CARD"
+                        ? "border-purple-500 bg-purple-500/5 ring-1 ring-purple-500 shadow-xs"
+                        : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value="CARD"
+                          checked={paymentMethod === "CARD"}
+                          onChange={() => setPaymentMethod("CARD")}
+                          className="h-4 w-4 text-purple-500 accent-purple-500"
+                        />
+                        <span className="font-bold text-xs uppercase tracking-wide text-foreground flex items-center gap-1.5">
+                          <CreditCard className="h-3.5 w-3.5 text-purple-400" />
+                          Card (Demo)
+                        </span>
+                      </div>
+                      <Badge variant="grail" className="text-[10px] px-1.5 py-0 h-4 gap-1">
+                        <Sparkles className="h-2.5 w-2.5" />
+                        Instant Paid
+                      </Badge>
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
+                      Simulated Visa / Mastercard payment. Instantly approved and marked paid.
+                    </p>
+                  </label>
+                </>
+              )}
             </div>
 
             {/* Delivery Instructions / Order Notes */}
@@ -726,7 +819,11 @@ export function CheckoutForm({
                 ) : (
                   <>
                     <Lock className="h-4 w-4" />
-                    Place Order &amp; Reserve • {formatPrice(totalAmount, currencySymbol)}
+                    {paymentMethod === "COD" && `Place Order (COD) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "GCASH" && `Pay with GCash (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "MAYA" && `Pay with Maya (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "CARD" && `Pay with Card (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "TEST" && `Simulate Payment • ${formatPrice(totalAmount, currencySymbol)}`}
                   </>
                 )}
               </Button>

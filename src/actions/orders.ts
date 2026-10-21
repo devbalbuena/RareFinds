@@ -10,6 +10,8 @@ import { checkAndExpireOrder } from "@/lib/orders/expiry";
 import { getStoreSettings } from "@/lib/settings";
 import { can } from "@/lib/permissions";
 
+import { getPaymentMode, getPaymentProvider } from "@/lib/payments";
+
 const newAddressSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
   phone: z.string().min(7, "Valid phone number required"),
@@ -24,7 +26,7 @@ const newAddressSchema = z.object({
 const placeOrderSchema = z.object({
   addressId: z.string().optional(),
   newAddress: newAddressSchema.optional(),
-  paymentMethod: z.enum(["COD", "TEST"]),
+  paymentMethod: z.enum(["COD", "TEST", "GCASH", "MAYA", "CARD"]),
   notes: z.string().max(500, "Notes too long").optional(),
 });
 
@@ -53,15 +55,14 @@ export async function placeOrderAction(input: PlaceOrderInput) {
 
   const { addressId, newAddress, paymentMethod, notes } = parsed.data;
 
-  // Verify TEST payment environment guard
-  if (paymentMethod === "TEST") {
-    const isTestAllowed =
-      process.env.NODE_ENV !== "production" ||
-      process.env.ENABLE_TEST_PAYMENTS === "true" ||
-      process.env.ENABLE_TEST_PAYMENTS?.trim() === "true";
-    if (!isTestAllowed) {
-      console.warn("[placeOrderAction] TEST payment disallowed by environment guard.");
-      return { error: "Test payments are disabled in production environment." };
+  // Strict Server-Side Enforcement of PAYMENT_MODE
+  const paymentMode = getPaymentMode();
+  if (paymentMethod !== "COD") {
+    if (paymentMode !== "demo") {
+      console.warn(`[placeOrderAction] Payment method ${paymentMethod} rejected: mode is ${paymentMode}`);
+      return {
+        error: "Online demo payments are disabled. Please checkout using Cash on Delivery (COD).",
+      };
     }
   }
 
@@ -198,12 +199,14 @@ export async function placeOrderAction(input: PlaceOrderInput) {
         }
       }
 
+      const isDemoPayment = paymentMethod !== "COD";
+
       // C. Reserve or Allocate each variant atomically with conditional update
       for (const item of cart.items) {
         const v = item.variant;
 
-        if (paymentMethod === "TEST") {
-          // TEST: Reserve for 15 minutes
+        if (isDemoPayment) {
+          // Demo payment: Reserve for 15 minutes hold
           const updateRes = await tx.productVariant.updateMany({
             where: {
               id: v.id,
@@ -276,20 +279,16 @@ export async function placeOrderAction(input: PlaceOrderInput) {
           subtotal: subtotalNumber,
           shippingFee: shippingFeeNumber,
           totalAmount: totalAmountNumber,
-          status:
-            paymentMethod === "TEST"
-              ? OrderStatus.PENDING_PAYMENT
-              : OrderStatus.PENDING,
+          status: isDemoPayment
+            ? OrderStatus.PENDING_PAYMENT
+            : OrderStatus.PENDING,
           paymentStatus: PaymentStatus.UNPAID,
-          paymentMethod:
-            paymentMethod === "TEST"
-              ? PaymentMethod.TEST
-              : PaymentMethod.COD,
-          paymentReference:
-            paymentMethod === "TEST"
-              ? `TEST-${orderNumber}`
-              : `COD-${orderNumber}`,
-          expiresAt: paymentMethod === "TEST" ? expiresAt : null,
+          paymentMethod: paymentMethod as PaymentMethod,
+          isSimulated: isDemoPayment,
+          paymentReference: isDemoPayment
+            ? `DEMO-${paymentMethod}-${orderNumber}`
+            : `COD-${orderNumber}`,
+          expiresAt: isDemoPayment ? expiresAt : null,
           notes: notes || null,
           items: {
             create: cart.items.map((item) => {
@@ -320,6 +319,12 @@ export async function placeOrderAction(input: PlaceOrderInput) {
 
       return order;
     });
+
+    // If demo payment, instantly complete payment with markPaid
+    if (paymentMethod !== "COD") {
+      const provider = getPaymentProvider(paymentMethod as PaymentMethod);
+      await provider.markPaid(result.id, `DEMO-${paymentMethod}-${result.orderNumber}`);
+    }
 
     revalidatePath("/checkout");
     revalidatePath("/account/orders");
@@ -434,6 +439,7 @@ export async function getOrderDetailsAction(orderId: string) {
     paymentStatus: order.paymentStatus,
     paymentMethod: order.paymentMethod,
     paymentReference: order.paymentReference,
+    isSimulated: order.isSimulated,
     trackingNumber: order.trackingNumber,
     shippingCarrier: order.shippingCarrier,
     notes: order.notes,
