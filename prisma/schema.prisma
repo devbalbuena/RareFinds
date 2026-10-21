@@ -252,6 +252,9 @@ enum PaymentStatus {
 enum PaymentMethod {
   COD
   TEST
+  GCASH
+  MAYA
+  CARD
 }
 
 model Order {
@@ -270,6 +273,7 @@ model Order {
   paymentStatus    PaymentStatus @default(UNPAID)
   paymentMethod    PaymentMethod @default(TEST)
   paymentReference String?       // Payment intent ID, transaction ref, or simulation ref
+  isSimulated      Boolean       @default(false)
   trackingNumber   String?
   shippingCarrier  String?       // e.g. "LBC", "J&T Express", "DHL"
   notes            String?       @db.Text
@@ -285,6 +289,7 @@ model Order {
   @@index([userId])
   @@index([orderNumber])
   @@index([status])
+  @@index([isSimulated])
   @@map("orders")
 }
 
