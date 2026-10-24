@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import {
   ShieldCheck,
   Truck,
@@ -11,24 +12,23 @@ import {
   AlertCircle,
   Loader2,
   Lock,
-  Plus,
-  Globe,
   MapPin,
   Sparkles,
   Smartphone,
   Store,
+  ExternalLink,
+  User,
+  Phone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatPrice } from "@/lib/utils";
 import { placeOrderAction } from "@/actions/orders";
 import {
-  COUNTRIES,
-  PHILIPPINES_REGIONS,
-} from "@/lib/constants/philippines-addresses";
+  calculateShippingFee,
+  getRegionZone,
+} from "@/lib/shipping";
 
 interface SerializedAddress {
   id: string;
@@ -88,9 +88,9 @@ export function CheckoutForm({
   pickupAddress = null,
   pickupInstructions = null,
   localDeliveryAreas = null,
-  codEnabled = false,
+  codEnabled = true,
   codAllowedAreas = null,
-  codMaxAmount = 20000,
+  codMaxAmount = 500000,
   manualPaymentInstructions = null,
   currencySymbol = "₱",
   storeName = "RareFinds",
@@ -101,93 +101,111 @@ export function CheckoutForm({
   const router = useRouter();
   const errorRef = React.useRef<HTMLDivElement>(null);
 
-  // Delivery Method state
-  type AllowedDeliveryMethod = "PICKUP" | "LOCAL_DELIVERY" | "COURIER";
-  const [deliveryMethod, setDeliveryMethod] = React.useState<AllowedDeliveryMethod>("COURIER");
-
-  // Dynamic Shipping Fee Calculation
-  const shippingFee = React.useMemo(() => {
-    if (deliveryMethod === "PICKUP") return 0;
-    if (deliveryMethod === "LOCAL_DELIVERY") return shippingFeeLocal;
-    return shippingFeeCourier;
-  }, [deliveryMethod, shippingFeeLocal, shippingFeeCourier]);
-
-  const totalAmount = subtotal + shippingFee;
-
-  // Address selection state
+  // Address selection state (strictly from saved addresses)
   const defaultAddress = savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
   const [selectedAddressId, setSelectedAddressId] = React.useState<string>(
-    defaultAddress ? defaultAddress.id : "new"
+    defaultAddress ? defaultAddress.id : ""
   );
 
-  // Cascading Philippine address states
-  const initialRegion = PHILIPPINES_REGIONS[0]; // NCR
-  const [selectedCountry, setSelectedCountry] = React.useState<string>("PH");
-  const [selectedRegionId, setSelectedRegionId] = React.useState<string>(initialRegion.id);
-  const [selectedCity, setSelectedCity] = React.useState<string>(initialRegion.cities[0]);
-  const [customCity, setCustomCity] = React.useState<string>("");
+  const selectedAddress =
+    savedAddresses.find((a) => a.id === selectedAddressId) || defaultAddress;
 
-  // New address form state
-  const [newAddress, setNewAddress] = React.useState({
-    fullName: userName || "",
-    phone: "",
-    street: "",
-    apartment: "",
-    city: initialRegion.cities[0],
-    province: initialRegion.name,
-    postalCode: "",
-    saveToAccount: true,
+  // Active address resolution for dynamic calculations
+  const activeAddressInfo = React.useMemo(() => {
+    if (selectedAddress) {
+      const zone = getRegionZone(selectedAddress.province);
+      return {
+        regionName: selectedAddress.province,
+        cityName: selectedAddress.city,
+        zoneKey: zone.zoneKey,
+        isNCR: zone.zoneKey === "NCR",
+      };
+    }
+    return {
+      regionName: "Metro Manila",
+      cityName: "Taguig City (BGC)",
+      zoneKey: "NCR" as const,
+      isNCR: true,
+    };
+  }, [selectedAddress]);
+
+  const isAddressInManila = activeAddressInfo.isNCR;
+
+  // Delivery & Payment Method state
+  type AllowedDeliveryMethod = "PICKUP" | "LOCAL_DELIVERY" | "COURIER";
+  const [deliveryMethod, setDeliveryMethod] = React.useState<AllowedDeliveryMethod>(() => {
+    return defaultAddress && getRegionZone(defaultAddress.province).zoneKey !== "NCR"
+      ? "COURIER"
+      : "LOCAL_DELIVERY";
   });
 
-  // Handle region dropdown change
-  const handleRegionChange = (regionId: string) => {
-    setSelectedRegionId(regionId);
-    const reg = PHILIPPINES_REGIONS.find((r) => r.id === regionId) || initialRegion;
-    const firstCity = reg.cities[0] || "";
-    setSelectedCity(firstCity);
-    setCustomCity("");
-    setNewAddress((prev) => ({
-      ...prev,
-      province: reg.name,
-      city: firstCity,
-    }));
-  };
-
-  // Handle city dropdown change
-  const handleCityChange = (cityName: string) => {
-    setSelectedCity(cityName);
-    if (cityName !== "__custom__") {
-      setNewAddress((prev) => ({
-        ...prev,
-        city: cityName,
-      }));
-    } else {
-      setNewAddress((prev) => ({
-        ...prev,
-        city: customCity || "",
-      }));
-    }
-  };
-
-  // Payment method state
   type AllowedPaymentMethod = "COD" | "GCASH" | "MAYA" | "CARD" | "TEST" | "MANUAL_TRANSFER";
   const [paymentMethod, setPaymentMethod] = React.useState<AllowedPaymentMethod>(
     paymentMode === "demo" ? "GCASH" : "COD"
   );
-  const [orderNotes, setOrderNotes] = React.useState("");
+
+  // Delivery method availability rules
+  const isCourierAvailable = !isAddressInManila;
+  const isLocalDeliveryAvailable = isAddressInManila;
+  const isPickupAvailable =
+    isAddressInManila && Boolean(pickupAddress && pickupAddress.trim().length > 0);
+
+  // Automatically adapt delivery method and payment method when address region changes
+  React.useEffect(() => {
+    if (isAddressInManila) {
+      // Address is in Manila: Courier is disabled; auto-select Local Delivery if Courier was chosen
+      if (deliveryMethod === "COURIER") {
+        setDeliveryMethod("LOCAL_DELIVERY");
+      }
+    } else {
+      // Address is outside Manila: Local Express & Self Pickup are disabled; auto-select Courier
+      if (deliveryMethod === "LOCAL_DELIVERY" || deliveryMethod === "PICKUP") {
+        setDeliveryMethod("COURIER");
+      }
+      // COD is not allowed outside Manila; auto-switch to online payment
+      if (paymentMethod === "COD") {
+        setPaymentMethod(paymentMode === "demo" ? "GCASH" : "CARD");
+      }
+    }
+  }, [isAddressInManila, deliveryMethod, paymentMethod, paymentMode]);
+
+  // Dynamic calculations for Courier & Local Express
+  const courierCalc = React.useMemo(() => {
+    return calculateShippingFee({
+      deliveryMethod: "COURIER",
+      regionIdOrName: activeAddressInfo.regionName,
+      cityName: activeAddressInfo.cityName,
+    });
+  }, [activeAddressInfo]);
+
+  const localExpressCalc = React.useMemo(() => {
+    return calculateShippingFee({
+      deliveryMethod: "LOCAL_DELIVERY",
+      regionIdOrName: activeAddressInfo.regionName,
+      cityName: activeAddressInfo.cityName,
+    });
+  }, [activeAddressInfo]);
+
+  // Selected delivery method shipping calculation
+  const shippingCalc = React.useMemo(() => {
+    return calculateShippingFee({
+      deliveryMethod,
+      regionIdOrName: activeAddressInfo.regionName,
+      cityName: activeAddressInfo.cityName,
+    });
+  }, [deliveryMethod, activeAddressInfo]);
+
+  const shippingFee = shippingCalc.fee;
+  const totalAmount = subtotal + shippingFee;
 
   const handleDeliveryMethodChange = (method: AllowedDeliveryMethod) => {
+    if (method === "COURIER" && !isCourierAvailable) return;
+    if (method === "LOCAL_DELIVERY" && !isLocalDeliveryAvailable) return;
+    if (method === "PICKUP" && !isPickupAvailable) return;
     setDeliveryMethod(method);
-    if (method === "COURIER" && paymentMethod === "COD") {
-      setPaymentMethod(
-        paymentMode === "demo"
-          ? "GCASH"
-          : manualPaymentInstructions
-          ? "MANUAL_TRANSFER"
-          : "CARD"
-      );
-    }
   };
+
+  const [orderNotes, setOrderNotes] = React.useState("");
 
   // Submission state
   const [isPending, setIsPending] = React.useState(false);
@@ -199,17 +217,16 @@ export function CheckoutForm({
     setIsPending(true);
 
     try {
-      const resolvedCity =
-        selectedCity === "__custom__" ? customCity.trim() : newAddress.city.trim();
-
-      if (deliveryMethod !== "PICKUP" && !resolvedCity && selectedAddressId === "new") {
-        setErrorMessage("Please enter a valid City / Municipality.");
+      if (deliveryMethod !== "PICKUP" && !selectedAddress) {
+        setErrorMessage(
+          "No delivery address selected. Please add your address in your profile before checking out."
+        );
         setIsPending(false);
         return;
       }
 
       const effectivePaymentMethod =
-        deliveryMethod === "COURIER" && paymentMethod === "COD"
+        !isAddressInManila && paymentMethod === "COD"
           ? paymentMode === "demo"
             ? "GCASH"
             : manualPaymentInstructions
@@ -221,22 +238,7 @@ export function CheckoutForm({
         deliveryMethod,
         paymentMethod: effectivePaymentMethod,
         notes: orderNotes.trim() || undefined,
-        ...(deliveryMethod === "PICKUP" && selectedAddressId === "new" && !resolvedCity
-          ? {}
-          : selectedAddressId !== "new"
-          ? { addressId: selectedAddressId }
-          : {
-              newAddress: {
-                fullName: newAddress.fullName.trim() || userName || "Collector",
-                phone: newAddress.phone.trim() || "09000000000",
-                street: newAddress.street.trim() || "Store Pickup",
-                apartment: newAddress.apartment?.trim() || undefined,
-                city: resolvedCity || "Pickup",
-                province: newAddress.province.trim() || "Pickup",
-                postalCode: newAddress.postalCode.trim() || "0000",
-                saveToAccount: newAddress.saveToAccount,
-              },
-            }),
+        ...(selectedAddress ? { addressId: selectedAddress.id } : {}),
       };
 
       const res = await placeOrderAction(payload);
@@ -272,22 +274,10 @@ export function CheckoutForm({
     }
   };
 
-  const isPickupAvailable = Boolean(pickupAddress && pickupAddress.trim().length > 0);
-  const isLocalDeliveryAvailable = Boolean(localDeliveryAreas && localDeliveryAreas.trim().length > 0);
-
-  const isCodDisabled =
-    !codEnabled ||
-    deliveryMethod === "COURIER" ||
-    totalAmount > codMaxAmount;
-
-  let codDisabledReason = "";
-  if (!codEnabled) {
-    codDisabledReason = "Cash on Delivery is currently disabled.";
-  } else if (deliveryMethod === "COURIER") {
-    codDisabledReason = "Advance payment required for nationwide courier shipments.";
-  } else if (totalAmount > codMaxAmount) {
-    codDisabledReason = `Exceeds max COD limit of ${formatPrice(codMaxAmount, currencySymbol)}.`;
-  }
+  // COD is enabled in Manila; disabled for provincial destinations
+  const isCodDisabled = !isAddressInManila;
+  const codDisabledReason =
+    "Cash on Delivery is available within Metro Manila only. Advance online payment required for provincial shipments.";
 
   return (
     <form onSubmit={handlePlaceOrder} className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
@@ -319,10 +309,12 @@ export function CheckoutForm({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Nationwide Courier */}
               <label
-                className={`relative flex flex-col justify-between p-4 rounded-xl border cursor-pointer transition-all ${
-                  deliveryMethod === "COURIER"
-                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
-                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                className={`relative flex flex-col justify-between p-4 rounded-xl border transition-all ${
+                  !isCourierAvailable
+                    ? "opacity-50 cursor-not-allowed bg-secondary/30 border-dashed"
+                    : deliveryMethod === "COURIER"
+                    ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs cursor-pointer"
+                    : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700 cursor-pointer"
                 }`}
               >
                 <div>
@@ -331,20 +323,33 @@ export function CheckoutForm({
                       type="radio"
                       name="deliveryMethod"
                       value="COURIER"
+                      disabled={!isCourierAvailable}
                       checked={deliveryMethod === "COURIER"}
                       onChange={() => handleDeliveryMethodChange("COURIER")}
                       className="h-4 w-4 text-primary accent-primary"
                     />
                     <span className="font-bold text-xs uppercase tracking-wide text-foreground">
-                      Courier
+                      Courier (Nationwide)
                     </span>
                   </div>
                   <div className="font-mono text-xs font-semibold text-primary">
-                    {formatPrice(shippingFeeCourier, currencySymbol)}
+                    {isCourierAvailable
+                      ? formatPrice(courierCalc.fee, currencySymbol)
+                      : "Provincial Only"}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-                    Nationwide insured air &amp; land courier. Double-boxed with live tracking.
+                    {isCourierAvailable
+                      ? `${courierCalc.zoneName} (${courierCalc.estimatedTransitTime}). Double-boxed insured air & land courier.`
+                      : "Standard nationwide courier is reserved for provincial shipments. For Metro Manila, choose Local Express or Self Pickup."}
                   </p>
+                  {!isCourierAvailable && (
+                    <Badge
+                      variant="outline"
+                      className="mt-2 text-[10px] text-amber-500 border-amber-500/30 bg-amber-500/10"
+                    >
+                      Provincial Only
+                    </Badge>
+                  )}
                 </div>
               </label>
 
@@ -352,7 +357,7 @@ export function CheckoutForm({
               <label
                 className={`relative flex flex-col justify-between p-4 rounded-xl border transition-all ${
                   !isLocalDeliveryAvailable
-                    ? "opacity-60 cursor-not-allowed bg-secondary/30 border-dashed"
+                    ? "opacity-50 cursor-not-allowed bg-secondary/30 border-dashed"
                     : deliveryMethod === "LOCAL_DELIVERY"
                     ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs cursor-pointer"
                     : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700 cursor-pointer"
@@ -374,24 +379,31 @@ export function CheckoutForm({
                     </span>
                   </div>
                   <div className="font-mono text-xs font-semibold text-primary">
-                    {formatPrice(shippingFeeLocal, currencySymbol)}
+                    {isLocalDeliveryAvailable
+                      ? formatPrice(localExpressCalc.fee, currencySymbol)
+                      : "Metro Manila Only"}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-                    Dedicated express rider handover verified with 4-digit security PIN.
+                    {isLocalDeliveryAvailable
+                      ? `${localExpressCalc.zoneName}. Dedicated express rider handover verified with 4-digit security PIN.`
+                      : "Express rider handover is available within Metro Manila cities only."}
                   </p>
                   {!isLocalDeliveryAvailable && (
-                    <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground">
-                      No coverage set
+                    <Badge
+                      variant="outline"
+                      className="mt-2 text-[10px] text-amber-500 border-amber-500/30 bg-amber-500/10"
+                    >
+                      Metro Manila Only
                     </Badge>
                   )}
                 </div>
               </label>
 
-              {/* Store Pickup */}
+              {/* Self Pickup (Renamed from Vault Pickup) */}
               <label
                 className={`relative flex flex-col justify-between p-4 rounded-xl border transition-all ${
                   !isPickupAvailable
-                    ? "opacity-60 cursor-not-allowed bg-secondary/30 border-dashed"
+                    ? "opacity-50 cursor-not-allowed bg-secondary/30 border-dashed"
                     : deliveryMethod === "PICKUP"
                     ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs cursor-pointer"
                     : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700 cursor-pointer"
@@ -409,18 +421,23 @@ export function CheckoutForm({
                       className="h-4 w-4 text-primary accent-primary"
                     />
                     <span className="font-bold text-xs uppercase tracking-wide text-foreground">
-                      Vault Pickup
+                      Self Pickup
                     </span>
                   </div>
                   <div className="font-mono text-xs font-semibold text-emerald-500">
-                    FREE
+                    {isPickupAvailable ? "FREE" : "Metro Manila Only"}
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-2 leading-relaxed">
-                    Collect directly from our store vault. Zero shipping fee. Valid ID required.
+                    {isPickupAvailable
+                      ? "Collect directly from our BGC vault. Zero shipping fee. Valid ID required."
+                      : "Self pickup is available at our BGC Manila warehouse only. For provincial destinations, choose nationwide courier."}
                   </p>
                   {!isPickupAvailable && (
-                    <Badge variant="outline" className="mt-2 text-[10px] text-muted-foreground">
-                      No pickup address set
+                    <Badge
+                      variant="outline"
+                      className="mt-2 text-[10px] text-amber-500 border-amber-500/30 bg-amber-500/10"
+                    >
+                      Metro Manila Only
                     </Badge>
                   )}
                 </div>
@@ -439,289 +456,152 @@ export function CheckoutForm({
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
             {deliveryMethod === "PICKUP" ? (
-              <div className="p-4 rounded-xl border bg-secondary/20 space-y-3">
-                <div className="flex items-start gap-3">
-                  <Store className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                  <div className="space-y-1 text-xs">
-                    <div className="font-bold text-foreground">RareFinds Official Vault Location</div>
-                    <p className="text-muted-foreground whitespace-pre-line">{pickupAddress}</p>
-                    {pickupInstructions && (
-                      <p className="text-[11px] text-amber-500 font-medium pt-1">
-                        Notice: {pickupInstructions}
-                      </p>
-                    )}
+              <div className="space-y-4">
+                <div className="p-4 rounded-xl border bg-secondary/20 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <Store className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                    <div className="space-y-1 text-xs">
+                      <div className="font-bold text-foreground">RareFinds Official Vault Location</div>
+                      <p className="text-muted-foreground whitespace-pre-line">{pickupAddress}</p>
+                      {pickupInstructions && (
+                        <p className="text-[11px] text-amber-500 font-medium pt-1">
+                          Notice: {pickupInstructions}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-dashed bg-secondary/10 flex items-center gap-3 text-xs">
+                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="text-muted-foreground">
+                    Order will be prepared for collection under:{" "}
+                    <span className="font-bold text-foreground">{userName || "Collector"}</span> ({userEmail}).
+                    Please bring 1 valid government ID upon claiming.
                   </div>
                 </div>
               </div>
             ) : (
-              <>
-            {savedAddresses.length > 0 && (
-              <div className="space-y-3">
-                <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Select Saved Address
-                </div>
-
-                <div className="grid grid-cols-1 gap-3">
-                  {savedAddresses.map((addr) => (
-                    <label
-                      key={addr.id}
-                      className={`flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                        selectedAddressId === addr.id
-                          ? "border-primary bg-primary/5 shadow-xs"
-                          : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="addressSelection"
-                        value={addr.id}
-                        checked={selectedAddressId === addr.id}
-                        onChange={() => setSelectedAddressId(addr.id)}
-                        className="mt-1 h-4 w-4 text-primary accent-primary"
-                      />
-                      <div className="flex-1 text-xs space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-foreground">{addr.fullName}</span>
-                          {addr.isDefault && (
-                            <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
-                              Default
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-muted-foreground">{addr.street}</p>
-                        {addr.apartment && <p className="text-muted-foreground">{addr.apartment}</p>}
-                        <p className="text-muted-foreground">
-                          {addr.city}, {addr.province} {addr.postalCode}
-                        </p>
-                        <p className="font-mono text-[11px] text-zinc-500 pt-0.5">
-                          Phone: {addr.phone}
-                        </p>
-                      </div>
-                    </label>
-                  ))}
-
-                  {/* Option for new address */}
-                  <label
-                    className={`flex items-center gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${
-                      selectedAddressId === "new"
-                        ? "border-primary bg-primary/5 shadow-xs"
-                        : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="addressSelection"
-                      value="new"
-                      checked={selectedAddressId === "new"}
-                      onChange={() => setSelectedAddressId("new")}
-                      className="h-4 w-4 text-primary accent-primary"
-                    />
-                    <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-                      <Plus className="h-3.5 w-3.5" />
-                      Add a New Shipping Address
-                    </div>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* New Address Inputs Form (shown if "new" is selected or no saved addresses) */}
-            {(selectedAddressId === "new" || savedAddresses.length === 0) && (() => {
-              const currentRegion =
-                PHILIPPINES_REGIONS.find((r) => r.id === selectedRegionId) ||
-                PHILIPPINES_REGIONS[0];
-
-              return (
-                <div className="pt-2 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Recipient Full Name */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                        Recipient Full Name *
-                      </label>
-                      <Input
-                        required
-                        value={newAddress.fullName}
-                        onChange={(e) =>
-                          setNewAddress({ ...newAddress, fullName: e.target.value })
-                        }
-                        placeholder="Juan Dela Cruz"
-                        className="h-10 text-xs"
-                      />
+              <div className="space-y-4">
+                {savedAddresses.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                        Select Delivery Address
+                      </span>
+                      <span className="text-[11px] text-muted-foreground">
+                        {savedAddresses.length} saved {savedAddresses.length === 1 ? "address" : "addresses"}
+                      </span>
                     </div>
 
-                    {/* Contact Phone Number */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                        Contact Phone Number *
-                      </label>
-                      <Input
-                        required
-                        type="tel"
-                        value={newAddress.phone}
-                        onChange={(e) =>
-                          setNewAddress({ ...newAddress, phone: e.target.value })
-                        }
-                        placeholder="0917 123 4567"
-                        className="h-10 text-xs"
-                      />
-                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                      {savedAddresses.map((addr) => {
+                        const addrZone = getRegionZone(addr.province);
+                        const isAddrManila = addrZone.zoneKey === "NCR";
 
-                    {/* Country / Territory Dropdown */}
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                        <span className="flex items-center gap-1.5">
-                          <Globe className="h-3.5 w-3.5 text-primary" />
-                          Country / Territory *
-                        </span>
-                        <span className="text-[10px] text-amber-500 font-medium">
-                          Philippines Only (Others Available Soon)
-                        </span>
-                      </label>
-                      <select
-                        value={selectedCountry}
-                        onChange={(e) => setSelectedCountry(e.target.value)}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      >
-                        {COUNTRIES.map((country) => (
-                          <option
-                            key={country.code}
-                            value={country.code}
-                            disabled={!country.available}
-                            className={!country.available ? "text-muted-foreground bg-muted/30" : "font-medium"}
+                        return (
+                          <label
+                            key={addr.id}
+                            className={`flex items-start gap-3.5 p-4 rounded-xl border cursor-pointer transition-all ${
+                              selectedAddressId === addr.id
+                                ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs"
+                                : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700"
+                            }`}
                           >
-                            {country.name}
-                          </option>
-                        ))}
-                      </select>
+                            <input
+                              type="radio"
+                              name="addressSelection"
+                              value={addr.id}
+                              checked={selectedAddressId === addr.id}
+                              onChange={() => setSelectedAddressId(addr.id)}
+                              className="mt-1 h-4 w-4 text-primary accent-primary"
+                            />
+                            <div className="flex-1 text-xs space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-foreground">{addr.fullName}</span>
+                                {addr.isDefault && (
+                                  <Badge variant="default" className="text-[10px] px-1.5 py-0 h-4">
+                                    Default
+                                  </Badge>
+                                )}
+                                {isAddrManila ? (
+                                  <Badge
+                                    variant="secondary"
+                                    className="text-[10px] px-1.5 py-0 h-4 text-emerald-600 bg-emerald-500/10 border-emerald-500/20 font-semibold"
+                                  >
+                                    Metro Manila (NCR)
+                                  </Badge>
+                                ) : (
+                                  <Badge
+                                    variant="outline"
+                                    className="text-[10px] px-1.5 py-0 h-4 text-blue-500 border-blue-500/30 bg-blue-500/10 font-semibold"
+                                  >
+                                    Provincial ({addr.province})
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-muted-foreground">{addr.street}</p>
+                              {addr.apartment && (
+                                <p className="text-muted-foreground">{addr.apartment}</p>
+                              )}
+                              <p className="text-muted-foreground font-medium">
+                                {addr.city}, {addr.province} {addr.postalCode}
+                              </p>
+                              <p className="font-mono text-[11px] text-zinc-500 pt-0.5 flex items-center gap-1.5">
+                                <Phone className="h-3 w-3" />
+                                {addr.phone}
+                              </p>
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
 
-                    {/* Province / Administrative Region Dropdown */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                        <MapPin className="h-3.5 w-3.5 text-primary" />
-                        Province / Administrative Region *
-                      </label>
-                      <select
-                        value={selectedRegionId}
-                        onChange={(e) => handleRegionChange(e.target.value)}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      >
-                        {PHILIPPINES_REGIONS.map((region) => (
-                          <option key={region.id} value={region.id}>
-                            {region.designation} — {region.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* City / Municipality Cascading Dropdown */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                        City / Municipality *
-                      </label>
-                      <select
-                        value={selectedCity}
-                        onChange={(e) => handleCityChange(e.target.value)}
-                        className="w-full h-10 rounded-md border border-input bg-background px-3 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      >
-                        {currentRegion.cities.map((city) => (
-                          <option key={city} value={city}>
-                            {city}
-                          </option>
-                        ))}
-                        <option value="__custom__">Other City / Municipality (Type Manually)</option>
-                      </select>
-                    </div>
-
-                    {/* Custom City Name Input (Shown when __custom__ is picked) */}
-                    {selectedCity === "__custom__" && (
-                      <div className="sm:col-span-2 space-y-1.5">
-                        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                          Enter Specific City / Municipality Name *
-                        </label>
-                        <Input
-                          required
-                          value={customCity}
-                          onChange={(e) => {
-                            setCustomCity(e.target.value);
-                            setNewAddress((prev) => ({ ...prev, city: e.target.value }));
-                          }}
-                          placeholder="Type your city or municipality name"
-                          className="h-10 text-xs"
-                        />
+                    {/* Notice & Link to Profile Address Settings */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border border-dashed bg-secondary/20 text-xs mt-3">
+                      <div className="space-y-0.5 text-muted-foreground">
+                        <span className="font-semibold text-foreground block">
+                          Need to update or change your default shipping address?
+                        </span>
+                        <p className="text-[11px] leading-relaxed">
+                          For security, delivery destinations are configured in your profile settings.
+                        </p>
                       </div>
-                    )}
-
-                    {/* Street Address & Building */}
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                        Street Address & Building *
-                      </label>
-                      <Input
-                        required
-                        value={newAddress.street}
-                        onChange={(e) =>
-                          setNewAddress({ ...newAddress, street: e.target.value })
-                        }
-                        placeholder="e.g. 123 Ayala Avenue, Tower 1 or Street / Purok"
-                        className="h-10 text-xs"
-                      />
-                    </div>
-
-                    {/* Unit / Apartment / Barangay (Optional) */}
-                    <div className="sm:col-span-2 space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                        Unit / Apartment / Barangay (Optional)
-                      </label>
-                      <Input
-                        value={newAddress.apartment}
-                        onChange={(e) =>
-                          setNewAddress({ ...newAddress, apartment: e.target.value })
-                        }
-                        placeholder="Unit 14B, Purok 5, Brgy. San Lorenzo"
-                        className="h-10 text-xs"
-                      />
-                    </div>
-
-                    {/* Postal / ZIP Code */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                        Postal / ZIP Code *
-                      </label>
-                      <Input
-                        required
-                        value={newAddress.postalCode}
-                        onChange={(e) =>
-                          setNewAddress({ ...newAddress, postalCode: e.target.value })
-                        }
-                        placeholder="e.g. 1200 or 8600"
-                        className="h-10 text-xs"
-                      />
-                    </div>
-
-                    {/* Save Address to Account Checkbox */}
-                    <div className="sm:col-span-2 flex items-center gap-2 pt-2">
-                      <Checkbox
-                        id="saveAddressCheckbox"
-                        checked={newAddress.saveToAccount}
-                        onCheckedChange={(checked) =>
-                          setNewAddress({ ...newAddress, saveToAccount: !!checked })
-                        }
-                      />
-                      <label
-                        htmlFor="saveAddressCheckbox"
-                        className="text-xs text-foreground cursor-pointer select-none font-medium"
+                      <Link
+                        href="/account"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border bg-background hover:bg-secondary font-semibold text-foreground text-xs shrink-0 transition-colors cursor-pointer"
                       >
-                        Save this address to my account for faster future orders
-                      </label>
+                        Edit Address in Profile
+                        <ExternalLink className="h-3 w-3" />
+                      </Link>
                     </div>
                   </div>
-                </div>
-              );
-            })()}
-            </>
-          )}
+                ) : (
+                  /* Empty state when user has no saved addresses */
+                  <div className="p-8 rounded-xl border border-dashed text-center space-y-3 bg-secondary/10">
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                      <MapPin className="h-6 w-6 text-amber-500" />
+                    </div>
+                    <div className="space-y-1 max-w-md mx-auto">
+                      <h4 className="font-bold text-sm text-foreground">No Delivery Address Found</h4>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        You do not have any saved shipping addresses on file. Please configure your default
+                        delivery address in your profile before completing checkout.
+                      </p>
+                    </div>
+                    <div className="pt-2">
+                      <Link
+                        href="/account"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-bold text-xs hover:bg-primary/90 transition-colors"
+                      >
+                        Go to Profile &amp; Add Address
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -739,7 +619,9 @@ export function CheckoutForm({
               <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-300 flex items-center gap-3 text-xs mb-4">
                 <Sparkles className="h-4 w-4 text-amber-400 shrink-0" />
                 <div>
-                  <span className="font-bold uppercase tracking-wider block">Demo mode: no real payment will be made.</span>
+                  <span className="font-bold uppercase tracking-wider block">
+                    Demo mode: no real payment will be made.
+                  </span>
                   <span className="text-[11px] text-amber-400/80">
                     GCash, Maya, and Card selections immediately simulate verified checkout and mark orders as paid.
                   </span>
@@ -752,7 +634,7 @@ export function CheckoutForm({
               <label
                 className={`relative flex flex-col justify-between p-4 rounded-xl border transition-all ${
                   isCodDisabled
-                    ? "opacity-60 cursor-not-allowed bg-secondary/30 border-dashed"
+                    ? "opacity-50 cursor-not-allowed bg-secondary/30 border-dashed"
                     : paymentMethod === "COD"
                     ? "border-primary bg-primary/5 ring-1 ring-primary shadow-xs cursor-pointer"
                     : "border-input bg-card hover:border-zinc-400 dark:hover:border-zinc-700 cursor-pointer"
@@ -775,12 +657,18 @@ export function CheckoutForm({
                     </span>
                   </div>
                   {isCodDisabled ? (
-                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 text-muted-foreground">
-                      Restricted
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] px-1.5 py-0 h-4 text-amber-500 border-amber-500/30 bg-amber-500/10"
+                    >
+                      Metro Manila Only
                     </Badge>
                   ) : (
-                    <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                      Official Delivery
+                    <Badge
+                      variant="secondary"
+                      className="text-[10px] px-1.5 py-0 h-4 text-emerald-600 bg-emerald-500/10 border-emerald-500/20 font-semibold"
+                    >
+                      Metro Manila Open
                     </Badge>
                   )}
                 </div>
@@ -788,12 +676,7 @@ export function CheckoutForm({
                 <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">
                   {isCodDisabled
                     ? codDisabledReason
-                    : "Pay cash upon courier inspection. Pair is allocated and processed for dispatch."}
-                  {codAllowedAreas && !isCodDisabled && (
-                    <span className="block text-[10px] text-muted-foreground/80 mt-1">
-                      Coverage: {codAllowedAreas}
-                    </span>
-                  )}
+                    : "Pay cash upon rider/courier delivery inspection. Pair is allocated and processed for dispatch."}
                 </p>
               </label>
 
@@ -1010,17 +893,23 @@ export function CheckoutForm({
               <div className="border-t pt-4 space-y-2 text-xs">
                 <div className="flex justify-between text-muted-foreground">
                   <span>Subtotal</span>
-                  <span className="font-medium text-foreground">{formatPrice(subtotal, currencySymbol)}</span>
+                  <span className="font-medium text-foreground">
+                    {formatPrice(subtotal, currencySymbol)}
+                  </span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span className="flex items-center gap-1">
-                    {deliveryMethod === "PICKUP" && "In-Store Vault Pickup"}
-                    {deliveryMethod === "LOCAL_DELIVERY" && "Local Express Delivery"}
-                    {deliveryMethod === "COURIER" && "Insured Courier Shipping"}
+                    {deliveryMethod === "PICKUP" && "In-Store Self Pickup (Free)"}
+                    {deliveryMethod === "LOCAL_DELIVERY" &&
+                      `Local Express (${shippingCalc.zoneName})`}
+                    {deliveryMethod === "COURIER" &&
+                      `Insured Courier (${shippingCalc.zoneName})`}
                     <ShieldCheck className="h-3 w-3 text-emerald-500" />
                   </span>
                   {shippingFee > 0 ? (
-                    <span className="font-semibold text-foreground">{formatPrice(shippingFee, currencySymbol)}</span>
+                    <span className="font-semibold text-foreground">
+                      {formatPrice(shippingFee, currencySymbol)}
+                    </span>
                   ) : (
                     <span className="text-emerald-500 font-semibold">FREE</span>
                   )}
@@ -1047,7 +936,8 @@ export function CheckoutForm({
                   <span>{storeName} Single-Vendor Guarantee</span>
                 </div>
                 <p className="leading-relaxed">
-                  Every sneaker is inspected in Manila. Exact 1-of-1 pair photographed is shipped double-boxed with serialized authenticity seal.
+                  Every sneaker is inspected in Manila. Exact 1-of-1 pair photographed is shipped
+                  double-boxed with serialized authenticity seal.
                 </p>
               </div>
 
@@ -1071,9 +961,9 @@ export function CheckoutForm({
               {/* Submit Button */}
               <Button
                 type="submit"
-                disabled={isPending}
+                disabled={isPending || (deliveryMethod !== "PICKUP" && !selectedAddress)}
                 size="lg"
-                className="w-full font-bold text-sm tracking-wide bg-amber-500 hover:bg-amber-600 text-black shadow-lg shadow-amber-500/25 h-12 gap-2 cursor-pointer"
+                className="w-full font-bold text-sm tracking-wide bg-amber-500 hover:bg-amber-600 text-black shadow-lg shadow-amber-500/25 h-12 gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPending ? (
                   <>
@@ -1083,18 +973,25 @@ export function CheckoutForm({
                 ) : (
                   <>
                     <Lock className="h-4 w-4" />
-                    {paymentMethod === "COD" && `Place Order (COD) • ${formatPrice(totalAmount, currencySymbol)}`}
-                    {paymentMethod === "MANUAL_TRANSFER" && `Place Order (Manual Transfer) • ${formatPrice(totalAmount, currencySymbol)}`}
-                    {paymentMethod === "GCASH" && `Pay with GCash (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
-                    {paymentMethod === "MAYA" && `Pay with Maya (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
-                    {paymentMethod === "CARD" && `Pay with Card (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
-                    {paymentMethod === "TEST" && `Simulate Payment • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "COD" &&
+                      `Place Order (COD) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "MANUAL_TRANSFER" &&
+                      `Place Order (Manual Transfer) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "GCASH" &&
+                      `Pay with GCash (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "MAYA" &&
+                      `Pay with Maya (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "CARD" &&
+                      `Pay with Card (Demo) • ${formatPrice(totalAmount, currencySymbol)}`}
+                    {paymentMethod === "TEST" &&
+                      `Simulate Payment • ${formatPrice(totalAmount, currencySymbol)}`}
                   </>
                 )}
               </Button>
 
               <p className="text-[10px] text-center text-muted-foreground">
-                By placing your order, you agree to RareFinds Terms of Authenticity and 1-of-1 Vault reservation rules.
+                By placing your order, you agree to RareFinds Terms of Authenticity and 1-of-1 Vault
+                reservation rules.
               </p>
             </CardContent>
           </Card>

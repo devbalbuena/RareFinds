@@ -12,6 +12,7 @@ import { getStoreSettings } from "@/lib/settings";
 import { can } from "@/lib/permissions";
 import { isAreaAllowed } from "@/lib/area-matching";
 import { getPaymentMode, getPaymentProvider } from "@/lib/payments";
+import { calculateShippingFee, getRegionZone } from "@/lib/shipping";
 
 const newAddressSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -190,34 +191,44 @@ export async function placeOrderAction(input: PlaceOrderInput) {
     return { error: "Please provide a shipping address." };
   }
 
-  // 3. Geographical Area Enforcement for Local Delivery (User Constraint #2)
-  if (deliveryMethod === "LOCAL_DELIVERY") {
-    if (!settings.localDeliveryAreas || settings.localDeliveryAreas.trim().length === 0) {
+  // 3. Geographical Area Enforcement for Local Delivery and Vault Pickup
+  if (deliveryMethod === "PICKUP") {
+    const zone = getRegionZone(shippingAddressSnapshot.province);
+    if (zone.zoneKey !== "NCR") {
       return {
-        error: "Local delivery is currently unavailable because no delivery areas have been configured.",
-      };
-    }
-    const isLocalAllowed = isAreaAllowed(
-      shippingAddressSnapshot.city,
-      shippingAddressSnapshot.province,
-      settings.localDeliveryAreas
-    );
-    if (!isLocalAllowed) {
-      return {
-        error: `Local delivery is not available for ${shippingAddressSnapshot.city}, ${shippingAddressSnapshot.province}. Please choose nationwide courier delivery.`,
+        error: "Vault pickup is only available for Metro Manila customers at our BGC vault. For provincial addresses, please choose Nationwide Courier.",
       };
     }
   }
 
-  // 4. Calculate Shipping Fee based on Delivery Method
-  let shippingFeeNumber = 0;
-  if (deliveryMethod === "PICKUP") {
-    shippingFeeNumber = 0;
-  } else if (deliveryMethod === "LOCAL_DELIVERY") {
-    shippingFeeNumber = Number(settings.shippingFeeLocal ?? 0);
-  } else if (deliveryMethod === "COURIER") {
-    shippingFeeNumber = Number(settings.shippingFeeCourier ?? 0);
+  if (deliveryMethod === "LOCAL_DELIVERY") {
+    const zone = getRegionZone(shippingAddressSnapshot.province);
+    if (zone.zoneKey !== "NCR") {
+      return {
+        error: `Local Express delivery is only available within Metro Manila. For ${shippingAddressSnapshot.province}, please choose Nationwide Courier.`,
+      };
+    }
+    if (settings.localDeliveryAreas && settings.localDeliveryAreas.trim().length > 0) {
+      const isLocalAllowed = isAreaAllowed(
+        shippingAddressSnapshot.city,
+        shippingAddressSnapshot.province,
+        settings.localDeliveryAreas
+      );
+      if (!isLocalAllowed) {
+        return {
+          error: `Local Express delivery is not available for ${shippingAddressSnapshot.city}, ${shippingAddressSnapshot.province}. Please choose nationwide courier delivery.`,
+        };
+      }
+    }
   }
+
+  // 4. Calculate Dynamic Distance-Based Shipping Fee
+  const shippingCalc = calculateShippingFee({
+    deliveryMethod: deliveryMethod as DeliveryMethod,
+    regionIdOrName: shippingAddressSnapshot.province,
+    cityName: shippingAddressSnapshot.city,
+  });
+  const shippingFeeNumber = shippingCalc.fee;
 
   // 5. Generate Delivery Security PIN for Local Delivery (User Constraint #5)
   const deliveryPin =
@@ -349,43 +360,22 @@ export async function placeOrderAction(input: PlaceOrderInput) {
       }, 0);
       const totalAmountNumber = subtotalNumber + shippingFeeNumber;
 
-      // E. Server-Side COD Guardrails (User Constraints #2, #8, #13)
+      // E. Server-Side COD Guardrails: Allowed within Metro Manila; Online only for Provincial
       if (isCod) {
-        if (!settings.codEnabled) {
-          throw new Error("Cash on Delivery is currently disabled by store management.");
-        }
-
-        if (deliveryMethod === "COURIER") {
+        const zone = getRegionZone(shippingAddressSnapshot.province);
+        if (zone.zoneKey !== "NCR") {
           throw new Error(
-            "Cash on Delivery is not available for nationwide courier shipments. Please select an online payment method or manual transfer."
+            "Cash on Delivery is available within Metro Manila only. Please choose an online payment method for provincial shipments."
           );
         }
 
-        if (
-          deliveryMethod === "LOCAL_DELIVERY" &&
-          settings.codAllowedAreas &&
-          settings.codAllowedAreas.trim().length > 0
-        ) {
-          const isCodAreaAllowed = isAreaAllowed(
-            shippingAddressSnapshot.city,
-            shippingAddressSnapshot.province,
-            settings.codAllowedAreas
-          );
-          if (!isCodAreaAllowed) {
-            throw new Error(
-              `Cash on Delivery is not available in ${shippingAddressSnapshot.city}, ${shippingAddressSnapshot.province}.`
-            );
-          }
-        }
-
-        // COD max compares against the grand total including shipping (User Constraint #13)
-        if (totalAmountNumber > Number(settings.codMaxAmount)) {
+        // COD maximum order value guardrail
+        const effectiveCodMax = Number(settings.codMaxAmount) > 0 ? Number(settings.codMaxAmount) : 200000;
+        if (totalAmountNumber > effectiveCodMax) {
           throw new Error(
-            `Cash on Delivery is limited to orders up to ₱${Number(settings.codMaxAmount).toLocaleString("en-PH", {
+            `Cash on Delivery is limited to orders up to ₱${effectiveCodMax.toLocaleString("en-PH", {
               minimumFractionDigits: 2,
-            })} (your order total with shipping is ₱${totalAmountNumber.toLocaleString("en-PH", {
-              minimumFractionDigits: 2,
-            })}). Please choose an online payment method.`
+            })}. Please choose an online payment method.`
           );
         }
       }
