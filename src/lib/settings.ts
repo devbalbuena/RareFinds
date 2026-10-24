@@ -29,12 +29,12 @@ async function fetchStoreSettings(): Promise<SiteConfig> {
       shippingFee: Number(settings.shippingFee ?? 0),
       shippingFeeLocal: Number(settings.shippingFeeLocal ?? 150),
       shippingFeeCourier: Number(settings.shippingFeeCourier ?? 250),
-      pickupAddress: settings.pickupAddress || null,
-      pickupInstructions: settings.pickupInstructions || null,
-      localDeliveryAreas: settings.localDeliveryAreas || null,
-      codEnabled: Boolean(settings.codEnabled ?? false),
-      codAllowedAreas: settings.codAllowedAreas || null,
-      codMaxAmount: Number(settings.codMaxAmount ?? 20000),
+      pickupAddress: settings.pickupAddress || defaultSiteConfig.pickupAddress,
+      pickupInstructions: settings.pickupInstructions || defaultSiteConfig.pickupInstructions,
+      localDeliveryAreas: settings.localDeliveryAreas || defaultSiteConfig.localDeliveryAreas,
+      codEnabled: Boolean(settings.codEnabled ?? defaultSiteConfig.codEnabled),
+      codAllowedAreas: settings.codAllowedAreas || defaultSiteConfig.codAllowedAreas,
+      codMaxAmount: Number(settings.codMaxAmount ?? 500000),
       manualPaymentInstructions: settings.manualPaymentInstructions || null,
       manualPaymentQrKey: settings.manualPaymentQrKey || null,
       manualPaymentHoldMinutes: settings.manualPaymentHoldMinutes ?? 60,
@@ -47,26 +47,10 @@ async function fetchStoreSettings(): Promise<SiteConfig> {
 }
 
 /**
- * Cached getter for Store Settings.
- * Cached with Next.js unstable_cache and tagged for on-demand revalidation.
- */
-const cachedGetStoreSettings = unstable_cache(
-  fetchStoreSettings,
-  ["store_settings_cache_key"],
-  {
-    tags: [STORE_SETTINGS_CACHE_TAG],
-    revalidate: 3600, // 1 hour background revalidation
-  }
-);
-
-/**
- * Public getter for Store Settings with cache & standalone execution support.
+ * Public getter for Store Settings.
+ * Direct fetch ensures dynamic real-time values for COD limits, address and delivery areas.
  */
 export async function getStoreSettings(): Promise<SiteConfig> {
-  try {
-    return await cachedGetStoreSettings();
-  } catch {
-    // Graceful fallback when executed outside Next.js request context (e.g. test scripts)
-    return await fetchStoreSettings();
-  }
+  return await fetchStoreSettings();
 }
+
