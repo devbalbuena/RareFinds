@@ -1162,7 +1162,7 @@ export function OrderDetailView({
                   {order.deliveryMethod === "LOCAL_DELIVERY"
                     ? "Local Delivery"
                     : order.deliveryMethod === "PICKUP"
-                    ? "Vault Pickup"
+                    ? "Self Pickup"
                     : "Courier"}
                 </span>
               </div>

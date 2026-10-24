@@ -264,7 +264,7 @@ export function OrderTrackingTimeline({
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium px-2.5 py-0.5 rounded-full bg-secondary text-foreground border">
               {deliveryMethod === "PICKUP"
-                ? "Store Vault Pickup"
+                ? "Self Pickup"
                 : deliveryMethod === "LOCAL_DELIVERY"
                 ? "Local Express Delivery"
                 : "Nationwide Courier"}
@@ -357,6 +357,28 @@ export function OrderTrackingTimeline({
         </div>
       )}
 
+      {/* ── COURIER DISPATCH PREPARATION CARD (BEFORE TRACKING NUMBER) ─── */}
+      {deliveryMethod === "COURIER" && (!shippingCarrier || !trackingNumber) && !isCancelled && !isExpired && (
+        <div className="rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Truck className="h-4 w-4 text-sky-500" />
+              <span className="text-xs uppercase font-bold text-sky-500 tracking-wider">
+                Nationwide Courier Dispatch Preparation
+              </span>
+            </div>
+            <p className="text-xs text-foreground">
+              Your pair is currently undergoing physical authenticity verification and double-box packing in our Manila vault. Once dispatched to our courier partner (LBC / J&T Express), your waybill number and real-time tracking link will automatically appear here.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[11px] font-mono font-semibold px-3 py-1.5 rounded-xl bg-background border border-sky-500/30 text-sky-500 shadow-xs">
+              Insured Air &amp; Land Freight
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* ── COURIER WAYBILL CARD (WHEN DISPATCHED) ───────────────────────── */}
       {deliveryMethod === "COURIER" && shippingCarrier && trackingNumber && (
         <div className="rounded-2xl border border-indigo-500/30 bg-indigo-500/5 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -405,6 +427,34 @@ export function OrderTrackingTimeline({
               </span>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── PRE-DELIVERY LOCKED RECEIPT NOTICE ───────────────────────────── */}
+      {!isDelivered && !isCancelled && !isExpired && (
+        <div className="rounded-2xl border border-dashed p-4 sm:p-5 bg-card/40 backdrop-blur-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-muted-foreground">
+          <div className="space-y-0.5">
+            <div className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+              <ShieldCheck className="h-4 w-4 text-amber-500" />
+              Delivery Confirmation &amp; Vault Warranty
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {deliveryMethod === "LOCAL_DELIVERY"
+                ? "The 'Confirm Received' button unlocks once our delivery rider arrives and verifies your 4-digit security PIN."
+                : deliveryMethod === "PICKUP"
+                ? "The 'Confirm Received' button unlocks once you claim and inspect your grails at our BGC vault."
+                : "The 'Confirm Received' button unlocks once courier transit is completed and marked delivered."}
+            </p>
+          </div>
+          <Button
+            disabled
+            size="sm"
+            variant="outline"
+            className="text-xs h-8 opacity-60 cursor-not-allowed shrink-0"
+          >
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+            Locked Until Delivered
+          </Button>
         </div>
       )}
 
