@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { OrderStatus, Role } from "@prisma/client";
+import { OrderStatus, PaymentStatus, Role } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import {
@@ -11,6 +11,8 @@ import {
   ArrowRight,
   Settings,
   Users,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +32,7 @@ export default async function AdminDashboardPage() {
     todayOrdersCount,
     todaySimulatedOrdersCount,
     recentOrders,
+    paidOrders,
   ] = await Promise.all([
     prisma.order.count({
       where: {
@@ -74,7 +77,54 @@ export default async function AdminDashboardPage() {
         createdAt: true,
       },
     }),
+    user.role === Role.ADMIN
+      ? prisma.order.findMany({
+          where: {
+            paymentStatus: PaymentStatus.PAID,
+            status: { notIn: [OrderStatus.CANCELLED, OrderStatus.EXPIRED] },
+          },
+          include: {
+            items: {
+              select: {
+                subtotal: true,
+                unitCost: true,
+                quantity: true,
+              },
+            },
+          },
+        })
+      : Promise.resolve([]),
   ]);
+
+  // Aggregate financial metrics for Owner/ADMIN
+  let totalRevenue = 0;
+  let realRevenue = 0;
+  let demoRevenue = 0;
+  let totalProfit = 0;
+  let realProfit = 0;
+  let demoProfit = 0;
+
+  for (const order of paidOrders) {
+    const orderRev = Number(order.totalAmount) - Number(order.shippingFee);
+    totalRevenue += orderRev;
+    if (order.isSimulated) {
+      demoRevenue += orderRev;
+    } else {
+      realRevenue += orderRev;
+    }
+
+    for (const item of order.items) {
+      const itemRevenue = Number(item.subtotal);
+      const itemCost = item.unitCost ? Number(item.unitCost) * item.quantity : 0;
+      const itemProfit = itemRevenue - itemCost;
+      totalProfit += itemProfit;
+      if (order.isSimulated) {
+        demoProfit += itemProfit;
+      } else {
+        realProfit += itemProfit;
+      }
+    }
+  }
 
   return (
     <div className="p-6 sm:p-10 space-y-8 max-w-7xl mx-auto">
@@ -111,7 +161,62 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
+      {/* Financial Overview (Visible Exclusively to Owner / ADMIN) */}
+      {user.role === Role.ADMIN && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Card 1: Vault Net Profit */}
+          <Card className="bg-gradient-to-br from-zinc-900 to-black text-white border-zinc-800 shadow-md">
+            <CardHeader className="p-5 pb-2">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center justify-between">
+                <span>Vault Net Profit (Owner Margin)</span>
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 pt-0 space-y-2">
+              <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white">
+                ₱{Math.round(totalProfit).toLocaleString()}
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-400 font-mono">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                  Real Profit: ₱{Math.round(realProfit).toLocaleString()}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-amber-400" />
+                  Demo Profit: ₱{Math.round(demoProfit).toLocaleString()}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Total Store Gross Revenue */}
+          <Card className="bg-gradient-to-br from-zinc-900 to-black text-white border-zinc-800 shadow-md">
+            <CardHeader className="p-5 pb-2">
+              <CardTitle className="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center justify-between">
+                <span>Total Gross Sales (Paid Orders)</span>
+                <Wallet className="h-4 w-4 text-sky-400" />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-5 pt-0 space-y-2">
+              <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white">
+                ₱{Math.round(totalRevenue).toLocaleString()}
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-400 font-mono">
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-sky-400" />
+                  Real Sales: ₱{Math.round(realRevenue).toLocaleString()}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-2 w-2 rounded-full bg-amber-400" />
+                  Demo Sales: ₱{Math.round(demoRevenue).toLocaleString()}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Operational KPI Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Stat 1: Pending Orders */}
         <Card className="bg-white border-zinc-200 text-zinc-900 shadow-xs">
