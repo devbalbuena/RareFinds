@@ -16,6 +16,8 @@ import {
   Store,
   AlertTriangle,
   Loader2,
+  Star,
+  ThumbsUp,
 } from "lucide-react";
 import { OrderStatus, PaymentMethod, DeliveryMethod } from "@prisma/client";
 import { Button } from "@/components/ui/button";
@@ -76,9 +78,13 @@ export function OrderTrackingTimeline({
     initialProblemReason || null
   );
 
-  // Problem reporting dialog state
+  // Problem reporting & Condition review states
   const [isReportingProblem, setIsReportingProblem] = React.useState(false);
   const [issueText, setIssueText] = React.useState("");
+  const [isConfirmingReceipt, setIsConfirmingReceipt] = React.useState(false);
+  const [reviewRating, setReviewRating] = React.useState<number>(5);
+  const [conditionVerified, setConditionVerified] = React.useState(true);
+  const [reviewNotes, setReviewNotes] = React.useState("");
   const [actionPending, setActionPending] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
 
@@ -89,15 +95,21 @@ export function OrderTrackingTimeline({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  async function handleConfirmReceived() {
+  async function handleSubmitConfirm(e: React.FormEvent) {
+    e.preventDefault();
     setActionPending(true);
     setActionError(null);
     try {
-      const res = await confirmReceivedCustomerAction(orderId);
+      const res = await confirmReceivedCustomerAction(orderId, {
+        rating: reviewRating,
+        feedback: reviewNotes.trim() || undefined,
+        conditionVerified,
+      });
       if (res.error) {
         setActionError(res.error);
       } else {
         setCustomerConfirmedAt(new Date().toISOString());
+        setIsConfirmingReceipt(false);
       }
     } catch {
       setActionError("Failed to confirm delivery receipt.");
@@ -475,21 +487,20 @@ export function OrderTrackingTimeline({
               {customerConfirmedAt ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                  Receipt Confirmed
+                  Receipt Confirmed • Condition Verified
                 </span>
               ) : (
                 <Button
-                  onClick={handleConfirmReceived}
+                  onClick={() => {
+                    setIsConfirmingReceipt(!isConfirmingReceipt);
+                    setIsReportingProblem(false);
+                  }}
                   disabled={actionPending}
                   size="sm"
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-8 rounded-lg cursor-pointer gap-1.5"
                 >
-                  {actionPending ? (
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  )}
-                  Confirm Received
+                  <ThumbsUp className="h-3.5 w-3.5" />
+                  Confirm Received &amp; Review
                 </Button>
               )}
 
@@ -497,7 +508,10 @@ export function OrderTrackingTimeline({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsReportingProblem(!isReportingProblem)}
+                  onClick={() => {
+                    setIsReportingProblem(!isReportingProblem);
+                    setIsConfirmingReceipt(false);
+                  }}
                   className="text-xs font-semibold h-8 rounded-lg cursor-pointer gap-1.5 text-rose-600 border-rose-300 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                 >
                   <AlertTriangle className="h-3 w-3" />
@@ -506,6 +520,103 @@ export function OrderTrackingTimeline({
               )}
             </div>
           </div>
+
+          {/* Condition Grading Review & Confirmation Form */}
+          {isConfirmingReceipt && !customerConfirmedAt && (
+            <form onSubmit={handleSubmitConfirm} className="pt-2 space-y-3.5 border-t mt-3 animate-in fade-in">
+              <div className="space-y-1">
+                <span className="text-xs font-bold text-foreground block">
+                  Verify Physical Sneaker Condition
+                </span>
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Rate your satisfaction and confirm that the physical pair matches the vault condition grading.
+                </p>
+              </div>
+
+              {/* Star Rating Selection */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground">Rating:</span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      className="p-1 hover:scale-110 transition-transform cursor-pointer"
+                    >
+                      <Star
+                        className={`h-4 w-4 ${
+                          star <= reviewRating
+                            ? "text-amber-400 fill-amber-400"
+                            : "text-muted-foreground"
+                        }`}
+                      />
+                    </button>
+                  ))}
+                  <span className="text-xs font-bold text-foreground ml-1">
+                    {reviewRating} / 5 Stars
+                  </span>
+                </div>
+              </div>
+
+              {/* Condition Verified Checkbox */}
+              <label className="flex items-start gap-2.5 p-3 rounded-xl border bg-secondary/20 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={conditionVerified}
+                  onChange={(e) => setConditionVerified(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 text-emerald-600 accent-emerald-600 rounded"
+                />
+                <div className="text-xs space-y-0.5">
+                  <span className="font-bold text-foreground block">
+                    Condition Grading Confirmed
+                  </span>
+                  <span className="text-[11px] text-muted-foreground block">
+                    I have unboxed and inspected the shoe. The condition (Deadstock / VNDS) and accessories match the photographed pair.
+                  </span>
+                </div>
+              </label>
+
+              {/* Optional Feedback */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider block">
+                  Collector Comments (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  placeholder="e.g. Flawless pair, double-boxed packaging was crisp..."
+                  className="w-full h-9 rounded-lg border border-input bg-background px-3 text-xs"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsConfirmingReceipt(false)}
+                  className="text-xs cursor-pointer"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={actionPending || !conditionVerified}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs gap-1.5 cursor-pointer"
+                >
+                  {actionPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  )}
+                  Confirm Handover &amp; Submit Review
+                </Button>
+              </div>
+            </form>
+          )}
 
           {actionError && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs">

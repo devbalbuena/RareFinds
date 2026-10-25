@@ -634,7 +634,10 @@ export async function getOrderDetailsAction(orderId: string) {
  * Strictly allowed only after staff marks DELIVERED.
  * Customer confirmation never marks COD as paid (User Constraint #10).
  */
-export async function confirmReceivedCustomerAction(orderId: string) {
+export async function confirmReceivedCustomerAction(
+  orderId: string,
+  review?: { rating?: number; feedback?: string; conditionVerified?: boolean }
+) {
   const session = await auth();
   if (!session?.user?.id) {
     return { error: "You must be signed in to confirm delivery." };
@@ -679,6 +682,9 @@ export async function confirmReceivedCustomerAction(orderId: string) {
       details: {
         orderNumber: order.orderNumber,
         customerConfirmedAt: updated.customerConfirmedAt,
+        rating: review?.rating ?? 5,
+        feedback: review?.feedback || null,
+        conditionVerified: review?.conditionVerified ?? true,
       },
     },
   });
