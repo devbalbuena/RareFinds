@@ -248,9 +248,13 @@ export function CartDrawer() {
                     </div>
 
                     <div className="flex items-baseline justify-between mt-2 pt-1 border-t text-xs">
-                      <span className="text-muted-foreground">Price:</span>
+                      <span className="text-muted-foreground">
+                        {item.quantity > 1
+                          ? `Qty: ${item.quantity} × ${formatPrice(item.price)}`
+                          : "Price:"}
+                      </span>
                       <span className="font-bold text-foreground">
-                        {formatPrice(item.price)}
+                        {formatPrice(item.price * item.quantity)}
                       </span>
                     </div>
                   </div>

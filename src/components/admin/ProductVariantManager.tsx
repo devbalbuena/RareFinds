@@ -374,6 +374,15 @@ export function ProductVariantManager({
                           SOLD
                         </Badge>
                       )}
+                      {(v.stockQty === 0 || v.isSold) && (
+                        <button
+                          type="button"
+                          onClick={() => setStockAdjustVariant(v)}
+                          className="h-5 px-1.5 rounded bg-amber-500 hover:bg-amber-600 text-black font-bold text-[10px] cursor-pointer shadow-2xs transition-colors"
+                        >
+                          + Restock
+                        </button>
+                      )}
                     </div>
                   </td>
 
@@ -394,19 +403,14 @@ export function ProductVariantManager({
                   {/* Actions */}
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      {/* Stock Adjustment (disabled for 1-of-1) */}
+                      {/* Stock Adjustment */}
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        disabled={v.isOneOfOne}
                         onClick={() => setStockAdjustVariant(v)}
-                        title={
-                          v.isOneOfOne
-                            ? "1-of-1 grails have fixed allocation"
-                            : "Adjust stock count"
-                        }
-                        className="h-7 px-2 text-zinc-500 hover:text-amber-600 hover:bg-amber-50 disabled:opacity-30"
+                        title="Adjust vault stock / restock"
+                        className="h-7 px-2 text-zinc-500 hover:text-amber-600 hover:bg-amber-50 cursor-pointer"
                       >
                         <Package className="h-3.5 w-3.5" />
                       </Button>
@@ -748,13 +752,23 @@ export function ProductVariantManager({
           onOpenChange={(open) => !open && setStockAdjustVariant(null)}
           productTitle={`${productTitle} (${stockAdjustVariant.size})`}
           variants={[stockAdjustVariant]}
-          onSuccess={() => {
-            // refresh variant locally or invoke callback
-            setVariants((prev) =>
-              prev.map((v) =>
-                v.id === stockAdjustVariant.id ? { ...v, stockQty: stockAdjustVariant.stockQty } : v
-              )
+          onSuccess={(newStock) => {
+            const updated = variants.map((v) =>
+              v.id === stockAdjustVariant.id
+                ? {
+                    ...v,
+                    stockQty: newStock,
+                    isSold: newStock <= 0,
+                    isOneOfOne: newStock === 1 ? v.isOneOfOne : false,
+                  }
+                : v
             );
+            setVariants(updated);
+            onVariantsChange?.(updated);
+            setActionAlert({
+              type: "success",
+              message: `Stock updated for ${stockAdjustVariant.size}: ${newStock} pair(s).`,
+            });
           }}
         />
       )}

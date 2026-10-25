@@ -4,8 +4,6 @@ import * as React from "react";
 import { Role } from "@prisma/client";
 import {
   createUserOrStaffAction,
-  promoteCustomerAction,
-  changeUserRoleAction,
   toggleUserActiveAction,
 } from "@/actions/users";
 import {
@@ -16,6 +14,7 @@ import {
   Loader2,
   UserX,
   UserCheck,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,32 +32,28 @@ interface SerializedUser {
 interface UsersManagementTableProps {
   initialUsers: SerializedUser[];
   currentUserId: string;
+  currentUserRole?: Role;
 }
 
 export function UsersManagementTable({
   initialUsers,
   currentUserId,
+  currentUserRole,
 }: UsersManagementTableProps) {
   const [users, setUsers] = React.useState<SerializedUser[]>(initialUsers);
   const [searchQuery, setSearchQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<string>("ALL");
+
+  const isAdmin = currentUserRole === Role.ADMIN;
 
   // Add staff modal state
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [addName, setAddName] = React.useState("");
   const [addEmail, setAddEmail] = React.useState("");
   const [addPassword, setAddPassword] = React.useState("");
-  const [addRole, setAddRole] = React.useState<"STAFF" | "ADMIN">("STAFF");
   const [addError, setAddError] = React.useState<string | null>(null);
   const [addSuccess, setAddSuccess] = React.useState<string | null>(null);
   const [isPending, setIsPending] = React.useState(false);
-
-  // Promote existing customer prompt state
-  const [existingCustomerData, setExistingCustomerData] = React.useState<{
-    id: string;
-    email: string;
-    name: string | null;
-  } | null>(null);
 
   // Action status message state
   const [actionAlert, setActionAlert] = React.useState<{
@@ -79,26 +74,16 @@ export function UsersManagementTable({
     e.preventDefault();
     setAddError(null);
     setAddSuccess(null);
-    setExistingCustomerData(null);
     setIsPending(true);
 
     const res = await createUserOrStaffAction({
       name: addName.trim(),
       email: addEmail.trim(),
       password: addPassword,
-      role: addRole,
+      role: "STAFF",
     });
 
     setIsPending(false);
-
-    if (res.customerExists && res.existingUserId) {
-      setExistingCustomerData({
-        id: res.existingUserId,
-        email: res.existingUserEmail || addEmail,
-        name: res.existingUserName || null,
-      });
-      return;
-    }
 
     if (res.error) {
       setAddError(res.error);
@@ -106,7 +91,7 @@ export function UsersManagementTable({
     }
 
     if (res.user) {
-      setAddSuccess(`Account for ${res.user.email} created as ${res.user.role}.`);
+      setAddSuccess(`Staff account for ${res.user.email} created successfully.`);
       setUsers((prev) => [res.user!, ...prev]);
       setAddName("");
       setAddEmail("");
@@ -116,53 +101,6 @@ export function UsersManagementTable({
         setAddSuccess(null);
       }, 1500);
     }
-  };
-
-  const handlePromoteExisting = async () => {
-    if (!existingCustomerData) return;
-    setAddError(null);
-    setIsPending(true);
-
-    const res = await promoteCustomerAction(existingCustomerData.id, addRole);
-    setIsPending(false);
-
-    if (res.error) {
-      setAddError(res.error);
-      return;
-    }
-
-    if (res.user) {
-      setUsers((prev) =>
-        prev.map((u) => (u.id === res.user!.id ? res.user! : u))
-      );
-      setAddSuccess(`Customer ${res.user.email} promoted to ${res.user.role}.`);
-      setExistingCustomerData(null);
-      setTimeout(() => {
-        setIsAddModalOpen(false);
-        setAddSuccess(null);
-      }, 1500);
-    }
-  };
-
-  const handleRoleChange = async (userId: string, newRole: Role) => {
-    setActionAlert(null);
-    setIsPending(true);
-
-    const res = await changeUserRoleAction(userId, newRole);
-    setIsPending(false);
-
-    if (res.error) {
-      setActionAlert({ type: "error", message: res.error });
-      return;
-    }
-
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-    );
-    setActionAlert({
-      type: "success",
-      message: `User role successfully updated to ${newRole}.`,
-    });
   };
 
   const handleToggleActive = async (userId: string, currentActive: boolean) => {
@@ -239,18 +177,19 @@ export function UsersManagementTable({
           </select>
         </div>
 
-        <Button
-          onClick={() => {
-            setIsAddModalOpen(true);
-            setAddError(null);
-            setAddSuccess(null);
-            setExistingCustomerData(null);
-          }}
-          className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-10 gap-1.5 cursor-pointer shadow-xs"
-        >
-          <UserPlus className="h-4 w-4" />
-          <span>Add Staff Account</span>
-        </Button>
+        {isAdmin && (
+          <Button
+            onClick={() => {
+              setIsAddModalOpen(true);
+              setAddError(null);
+              setAddSuccess(null);
+            }}
+            className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-10 gap-1.5 cursor-pointer shadow-xs"
+          >
+            <UserPlus className="h-4 w-4" />
+            <span>Add Staff Account</span>
+          </Button>
+        )}
       </div>
 
       {/* Users Table */}
@@ -260,9 +199,9 @@ export function UsersManagementTable({
             <thead className="bg-zinc-50/80 border-b border-zinc-200 text-[11px] font-bold uppercase tracking-wider text-zinc-600">
               <tr>
                 <th className="py-3.5 px-4">User Details</th>
-                <th className="py-3.5 px-4">Current Role</th>
+                <th className="py-3.5 px-4">Role</th>
                 <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Role Assignment</th>
+                <th className="py-3.5 px-4">Created</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
@@ -323,25 +262,12 @@ export function UsersManagementTable({
                         )}
                       </td>
 
-                      <td className="py-3.5 px-4">
-                        {isSelf ? (
-                          <span className="text-[11px] text-zinc-400 italic">
-                            Cannot change own role
-                          </span>
-                        ) : (
-                          <select
-                            disabled={isPending}
-                            value={u.role}
-                            onChange={(e) =>
-                              handleRoleChange(u.id, e.target.value as Role)
-                            }
-                            className="h-8 rounded-lg border border-zinc-300 bg-white px-2 text-xs text-zinc-800 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 cursor-pointer disabled:opacity-50 shadow-2xs font-medium"
-                          >
-                            <option value="CUSTOMER">Customer</option>
-                            <option value="STAFF">Staff</option>
-                            <option value="ADMIN">Admin</option>
-                          </select>
-                        )}
+                      <td className="py-3.5 px-4 text-zinc-500 font-mono text-[11px]">
+                        {new Date(u.createdAt).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
                       </td>
 
                       <td className="py-3.5 px-4 text-right">
@@ -417,120 +343,85 @@ export function UsersManagementTable({
               </div>
             )}
 
-            {/* If Customer exists prompt */}
-            {existingCustomerData ? (
-              <div className="p-4 rounded-xl border border-amber-300 bg-amber-50 space-y-3 text-xs">
-                <div className="font-bold text-amber-900 flex items-center gap-1.5">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  Existing Customer Detected
-                </div>
-                <p className="text-zinc-700 leading-relaxed">
-                  <strong>{existingCustomerData.email}</strong> is already registered as a Customer. Would you like to promote this account to <strong>{addRole}</strong>?
-                </p>
-                <div className="flex items-center gap-2 pt-1">
-                  <Button
-                    onClick={handlePromoteExisting}
-                    disabled={isPending}
-                    className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 cursor-pointer shadow-xs"
-                  >
-                    {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
-                    Yes, Promote to {addRole}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => setExistingCustomerData(null)}
-                    disabled={isPending}
-                    className="h-9 text-xs border-zinc-200 font-semibold"
-                  >
-                    Cancel
-                  </Button>
-                </div>
+            <form onSubmit={handleCreateStaff} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+                  Full Name *
+                </label>
+                <Input
+                  required
+                  value={addName}
+                  onChange={(e) => setAddName(e.target.value)}
+                  placeholder="e.g. Maria Santos"
+                  className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
+                />
               </div>
-            ) : (
-              <form onSubmit={handleCreateStaff} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
-                    Full Name *
-                  </label>
-                  <Input
-                    required
-                    value={addName}
-                    onChange={(e) => setAddName(e.target.value)}
-                    placeholder="e.g. Maria Santos"
-                    className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
-                  />
-                </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
-                    Email Address *
-                  </label>
-                  <Input
-                    required
-                    type="email"
-                    value={addEmail}
-                    onChange={(e) => setAddEmail(e.target.value)}
-                    placeholder="staff@rarefinds.ph"
-                    className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
-                  />
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+                  Email Address *
+                </label>
+                <Input
+                  required
+                  type="email"
+                  value={addEmail}
+                  onChange={(e) => setAddEmail(e.target.value)}
+                  placeholder="staff@rarefinds.ph"
+                  className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
+                />
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
-                    Account Role *
-                  </label>
-                  <select
-                    value={addRole}
-                    onChange={(e) => setAddRole(e.target.value as "STAFF" | "ADMIN")}
-                    className="w-full h-10 rounded-xl border border-zinc-300 bg-white px-3 text-xs text-zinc-900 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-amber-500 font-medium"
-                  >
-                    <option value="STAFF">STAFF (Fulfill Orders &amp; Update Stock)</option>
-                    <option value="ADMIN">ADMIN (Full Platform Privileges)</option>
-                  </select>
+              <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900 space-y-1">
+                <div className="font-bold flex items-center gap-1.5">
+                  <Badge className="bg-blue-600 text-white border-0 text-[10px] font-bold">STAFF</Badge>
+                  <span>Designated Role: Staff Account</span>
                 </div>
+                <p className="text-[11px] text-blue-800 leading-relaxed">
+                  Staff members are authorized to fulfill orders, inspect inventory, and adjust stock counts. Account roles are permanent and immutable after creation.
+                </p>
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
-                    Temporary Password *
-                  </label>
-                  <Input
-                    required
-                    type="password"
-                    value={addPassword}
-                    onChange={(e) => setAddPassword(e.target.value)}
-                    placeholder="Min 8 chars, uppercase, lowercase, number, symbol"
-                    className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
-                  />
-                  <p className="text-[10px] text-zinc-500">
-                    Must contain at least 8 characters with upper, lower, number, and special symbol.
-                  </p>
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 block">
+                  Temporary Password *
+                </label>
+                <Input
+                  required
+                  type="password"
+                  value={addPassword}
+                  onChange={(e) => setAddPassword(e.target.value)}
+                  placeholder="Min 8 chars, uppercase, lowercase, number, symbol"
+                  className="h-10 text-xs bg-white border-zinc-300 text-zinc-900"
+                />
+                <p className="text-[10px] text-zinc-500">
+                  Must contain at least 8 characters with upper, lower, number, and special symbol.
+                </p>
+              </div>
 
-                <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsAddModalOpen(false)}
-                    disabled={isPending}
-                    className="h-9 text-xs border-zinc-200 text-zinc-700 font-semibold"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isPending}
-                    className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 cursor-pointer gap-1.5 shadow-xs"
-                  >
-                    {isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <UserPlus className="h-3.5 w-3.5" />
-                    )}
-                    <span>Create {addRole} Account</span>
-                  </Button>
-                </div>
-              </form>
-            )}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-zinc-200">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddModalOpen(false)}
+                  disabled={isPending}
+                  className="h-9 text-xs border-zinc-200 text-zinc-700 font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isPending}
+                  className="bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs h-9 cursor-pointer gap-1.5 shadow-xs"
+                >
+                  {isPending ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <UserPlus className="h-3.5 w-3.5" />
+                  )}
+                  <span>Create Staff Account</span>
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

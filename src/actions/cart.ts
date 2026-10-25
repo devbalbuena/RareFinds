@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 
 const addToCartSchema = z.object({
   variantId: z.string().min(1, "Variant ID is required"),
+  quantity: z.number().int().min(1).max(2).default(1),
 });
 
 const removeFromCartSchema = z.object({
@@ -137,7 +138,7 @@ export async function getCartAction() {
   };
 }
 
-export async function addToCartAction(rawVariantId: string) {
+export async function addToCartAction(rawVariantId: string, rawQuantity: number = 1) {
   const session = await auth();
   if (!session?.user?.id) {
     return {
@@ -147,12 +148,18 @@ export async function addToCartAction(rawVariantId: string) {
     };
   }
 
-  const validated = addToCartSchema.safeParse({ variantId: rawVariantId });
+  const validated = addToCartSchema.safeParse({
+    variantId: rawVariantId,
+    quantity: rawQuantity,
+  });
   if (!validated.success) {
-    return { error: "INVALID_INPUT", message: "Invalid product variant selected." };
+    return {
+      error: "INVALID_INPUT",
+      message: "Invalid sneaker selection or quantity (maximum 2 pairs).",
+    };
   }
 
-  const { variantId } = validated.data;
+  const { variantId, quantity } = validated.data;
   const userId = session.user.id;
 
   try {
@@ -183,7 +190,7 @@ export async function addToCartAction(rawVariantId: string) {
     ) {
       return {
         error: "ON_HOLD",
-        message: "This 1-of-1 pair is currently on checkout hold by another collector. Please try again soon.",
+        message: "This pair is currently on checkout hold by another collector. Please try again soon.",
       };
     }
 
@@ -208,24 +215,29 @@ export async function addToCartAction(rawVariantId: string) {
       },
     });
 
-    if (existingItem) {
-      if (variant.isOneOfOne) {
-        return {
-          error: "ALREADY_IN_CART",
-          message: "This rare 1-of-1 pair is already in your cart.",
-        };
-      }
-      // For multi-stock, increment quantity if stock allows
-      if (existingItem.quantity + 1 > variant.stockQty) {
-        return {
-          error: "MAX_STOCK",
-          message: `Only ${variant.stockQty} pair(s) available in stock.`,
-        };
-      }
+    const targetQuantity = existingItem
+      ? existingItem.quantity + quantity
+      : quantity;
 
+    if (targetQuantity > 2) {
+      return {
+        error: "LIMIT_EXCEEDED",
+        message:
+          "Order limit reached: Maximum 2 pairs permitted per order. For bulk orders or consignment allocations, please contact our concierge.",
+      };
+    }
+
+    if (targetQuantity > variant.stockQty) {
+      return {
+        error: "MAX_STOCK",
+        message: `Only ${variant.stockQty} pair(s) currently available in our vault.`,
+      };
+    }
+
+    if (existingItem) {
       await prisma.cartItem.update({
         where: { id: existingItem.id },
-        data: { quantity: existingItem.quantity + 1 },
+        data: { quantity: targetQuantity },
       });
     } else {
       // Add new item
@@ -233,7 +245,7 @@ export async function addToCartAction(rawVariantId: string) {
         data: {
           cartId: cart.id,
           variantId,
-          quantity: 1,
+          quantity: targetQuantity,
         },
       });
     }

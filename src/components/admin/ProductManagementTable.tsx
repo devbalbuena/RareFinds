@@ -461,7 +461,7 @@ export function ProductManagementTable({
                   const primaryImage =
                     product.images.find((img) => img.isPrimary) || product.images[0];
                   const totalStock = product.variants.reduce((acc, v) => acc + v.stockQty, 0);
-                  const isSoldOut = totalStock === 0 || product.variants.every((v) => v.isSold);
+                  const isSoldOut = totalStock <= 0 || product.variants.every((v) => v.isSold || v.stockQty <= 0);
                   const prices = product.variants.map((v) => v.price);
                   const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
                   const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;

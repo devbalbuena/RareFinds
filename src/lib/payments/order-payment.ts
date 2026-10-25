@@ -50,33 +50,21 @@ export async function completeOrderPayment(
       if (item.variantId && item.variant) {
         const v = item.variant;
 
-        if (v.isOneOfOne) {
-          // Permanently mark 1-of-1 pair as sold and clear holds
-          await tx.productVariant.update({
-            where: { id: v.id },
-            data: {
-              isSold: true,
-              reservedUntil: null,
-              reservedBy: null,
-            },
-          });
-        } else {
-          // Standard multi-quantity sneaker:
-          // If the order was COD, stock was already decremented upon order placement.
-          // For non-COD (GCASH, MAYA, CARD, TEST), decrement stock now upon confirmed payment.
-          const shouldDecrement = order.paymentMethod !== PaymentMethod.COD;
+        // Determine new stock count (COD was decremented at checkout placement)
+        const shouldDecrement = order.paymentMethod !== PaymentMethod.COD;
+        const newStock = shouldDecrement
+          ? Math.max(0, v.stockQty - item.quantity)
+          : v.stockQty;
 
-          await tx.productVariant.update({
-            where: { id: v.id },
-            data: {
-              ...(shouldDecrement
-                ? { stockQty: Math.max(0, v.stockQty - item.quantity) }
-                : {}),
-              reservedUntil: null,
-              reservedBy: null,
-            },
-          });
-        }
+        await tx.productVariant.update({
+          where: { id: v.id },
+          data: {
+            stockQty: newStock,
+            isSold: newStock <= 0,
+            reservedUntil: null,
+            reservedBy: null,
+          },
+        });
       }
     }
 
@@ -187,26 +175,17 @@ export async function cancelCustomerOrder(
           order.paymentMethod === PaymentMethod.COD ||
           (order.isSimulated && order.status === OrderStatus.PAID)
         ) {
-          // COD or PAID demo order previously marked 1-of-1 isSold=true or decremented stockQty
-          if (v.isOneOfOne) {
-            await tx.productVariant.update({
-              where: { id: v.id },
-              data: {
-                isSold: false,
-                reservedUntil: null,
-                reservedBy: null,
-              },
-            });
-          } else {
-            await tx.productVariant.update({
-              where: { id: v.id },
-              data: {
-                stockQty: { increment: item.quantity },
-                reservedUntil: null,
-                reservedBy: null,
-              },
-            });
-          }
+          // COD or PAID demo order previously decremented stockQty or marked sold
+          const restoredStock = v.stockQty + item.quantity;
+          await tx.productVariant.update({
+            where: { id: v.id },
+            data: {
+              stockQty: restoredStock,
+              isSold: false,
+              reservedUntil: null,
+              reservedBy: null,
+            },
+          });
         } else {
           // TEST/unpaid hold: clear reservation if held by this user
           await tx.productVariant.update({

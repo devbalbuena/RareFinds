@@ -69,26 +69,26 @@ export default async function EditProductPage({ params }: PageProps) {
   }));
 
   return (
-    <div className="p-6 sm:p-10 max-w-5xl mx-auto space-y-8">
+    <div className="p-6 sm:p-10 max-w-5xl mx-auto space-y-8 text-zinc-900">
       {/* Breadcrumb & Navigation */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-xs text-zinc-500">
-          <Link href="/admin" className="hover:text-white">
+        <div className="flex items-center gap-2 text-xs text-zinc-500 font-medium">
+          <Link href="/admin" className="hover:text-zinc-900 transition-colors">
             Dashboard
           </Link>
           <span>/</span>
-          <Link href="/admin/products" className="hover:text-white">
+          <Link href="/admin/products" className="hover:text-zinc-900 transition-colors">
             Sneakers
           </Link>
           <span>/</span>
-          <span className="text-zinc-300">{product.title}</span>
+          <span className="text-zinc-900 font-bold line-clamp-1 max-w-xs">{product.title}</span>
         </div>
 
         {product.status === ProductStatus.ACTIVE && (
           <Link
             href={`/products/${product.slug}`}
             target="_blank"
-            className="flex items-center gap-1.5 text-xs text-amber-500 hover:text-amber-400 font-semibold transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg font-bold transition-all shadow-2xs"
           >
             <span>View Live on Store</span>
             <ExternalLink className="h-3.5 w-3.5" />
@@ -97,32 +97,43 @@ export default async function EditProductPage({ params }: PageProps) {
       </div>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-800 pb-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black uppercase tracking-tight text-white">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-zinc-200 pb-6 bg-white p-6 rounded-2xl border shadow-xs">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="text-2xl font-black uppercase tracking-tight text-zinc-900">
               {product.title}
             </h1>
             {product.status === ProductStatus.ACTIVE && (
-              <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-xs font-semibold">
+              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-xs font-bold">
                 ACTIVE
               </Badge>
             )}
             {product.status === ProductStatus.DRAFT && (
-              <Badge className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-xs font-semibold">
+              <Badge className="bg-amber-50 text-amber-700 border-amber-200 text-xs font-bold">
                 DRAFT
               </Badge>
             )}
             {product.status === ProductStatus.ARCHIVED && (
-              <Badge className="bg-zinc-800 text-zinc-400 border-zinc-700 text-xs font-semibold">
+              <Badge className="bg-zinc-100 text-zinc-700 border-zinc-300 text-xs font-bold">
                 ARCHIVED
               </Badge>
             )}
           </div>
-          <p className="text-xs text-zinc-400">
-            /{product.slug} • Brand: <span className="text-white font-semibold">{product.brand.name}</span> •
-            Category: <span className="text-white font-semibold">{product.category.name}</span>
-          </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-600">
+            <span className="font-mono bg-zinc-100 px-2 py-0.5 rounded text-zinc-700 border border-zinc-200 font-medium">
+              /{product.slug}
+            </span>
+            <span>•</span>
+            <span>Brand: <strong className="text-zinc-900">{product.brand.name}</strong></span>
+            <span>•</span>
+            <span>Category: <strong className="text-zinc-900">{product.category.name}</strong></span>
+            {product.sku && (
+              <>
+                <span>•</span>
+                <span className="font-mono text-zinc-500">SKU: {product.sku}</span>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

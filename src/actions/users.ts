@@ -39,13 +39,16 @@ export type CreateStaffInput = z.infer<typeof createStaffSchema>;
 export async function createUserOrStaffAction(input: CreateStaffInput) {
   try {
     const caller = await verifyAdminSession("user:create-staff");
+    if (caller.role !== Role.ADMIN) {
+      return { error: "Forbidden: Only administrators are authorized to create staff accounts." };
+    }
 
     const parsed = createStaffSchema.safeParse(input);
     if (!parsed.success) {
       return { error: parsed.error.issues[0]?.message || "Invalid input data." };
     }
 
-    const { name, email: rawEmail, password, role } = parsed.data;
+    const { name, email: rawEmail, password } = parsed.data;
     const email = rawEmail.toLowerCase().trim();
 
     // Check if user already exists
@@ -55,16 +58,11 @@ export async function createUserOrStaffAction(input: CreateStaffInput) {
     });
 
     if (existingUser) {
-      if (existingUser.role === Role.CUSTOMER) {
-        return {
-          customerExists: true,
-          existingUserId: existingUser.id,
-          existingUserName: existingUser.name,
-          existingUserEmail: existingUser.email,
-          message: `A customer account with "${email}" already exists. Would you like to promote them to ${role} instead?`,
-        };
-      }
-      return { error: `An account with "${email}" already exists as ${existingUser.role}.` };
+      return {
+        error: `An account with "${email}" already exists as ${existingUser.role}. Role conversions are not permitted.`,
+        customerExists: existingUser.role === Role.CUSTOMER,
+        existingUserId: existingUser.id,
+      };
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -74,7 +72,7 @@ export async function createUserOrStaffAction(input: CreateStaffInput) {
         name,
         email,
         passwordHash,
-        role: role as Role,
+        role: Role.STAFF,
         isActive: true,
       },
       select: { id: true, name: true, email: true, role: true, isActive: true, createdAt: true },

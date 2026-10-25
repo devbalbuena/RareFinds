@@ -13,7 +13,11 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  Minus,
+  Plus,
+  MessageSquare,
 } from "lucide-react";
+import Link from "next/link";
 import { addToCartAction } from "@/actions/cart";
 
 interface Variant {
@@ -44,9 +48,14 @@ export function ProductVariantSelector({
   const [selectedId, setSelectedId] = React.useState<string>(
     variants[0]?.id || ""
   );
+  const [quantity, setQuantity] = React.useState<number>(1);
   const [isPending, setIsPending] = React.useState(false);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setQuantity(1);
+  }, [selectedId]);
 
   const now = React.useSyncExternalStore(
     emptySubscribe,
@@ -66,6 +75,7 @@ export function ProductVariantSelector({
   );
 
   const isSold = selectedVariant.isSold || selectedVariant.stockQty <= 0;
+  const maxAvailable = Math.min(2, Math.max(1, selectedVariant.stockQty));
 
   const conditionMap: Record<
     Condition,
@@ -82,7 +92,7 @@ export function ProductVariantSelector({
     setIsPending(true);
 
     try {
-      const res = await addToCartAction(selectedVariant.id);
+      const res = await addToCartAction(selectedVariant.id, quantity);
 
       if (res.requiresLogin) {
         const callbackUrl = encodeURIComponent(pathname);
@@ -216,6 +226,60 @@ export function ProductVariantSelector({
         </div>
       )}
 
+      {/* Quantity Stepper & Concierge Notice (Max 2 pairs) */}
+      {!isSold && (
+        <div className="space-y-3 rounded-xl border border-border/80 bg-card/60 p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground block">
+                Order Quantity
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                Limit 2 pairs per collector order
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2 border border-border rounded-lg bg-background p-1">
+              <button
+                type="button"
+                onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
+                disabled={quantity <= 1 || isPending}
+                className="h-8 w-8 flex items-center justify-center rounded text-sm font-bold text-foreground hover:bg-accent disabled:opacity-30 cursor-pointer transition-colors"
+                aria-label="Decrease quantity"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <span className="w-8 text-center font-bold text-sm text-foreground">
+                {quantity}
+              </span>
+              <button
+                type="button"
+                onClick={() => setQuantity((prev) => Math.min(maxAvailable, prev + 1))}
+                disabled={quantity >= maxAvailable || isPending}
+                className="h-8 w-8 flex items-center justify-center rounded text-sm font-bold text-foreground hover:bg-accent disabled:opacity-30 cursor-pointer transition-colors"
+                aria-label="Increase quantity"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2 pt-2.5 border-t border-border/50 text-[11px] text-muted-foreground leading-relaxed">
+            <MessageSquare className="h-3.5 w-3.5 shrink-0 text-amber-500 mt-0.5" />
+            <span>
+              Collector policy restricts self-checkout to a maximum of <strong>2 pairs</strong>. Need to place a bulk order or request VIP consignment sourcing?{" "}
+              <Link
+                href="/about"
+                className="text-amber-500 hover:text-amber-400 font-bold underline underline-offset-2 transition-colors"
+              >
+                Chat directly with our admin or staff
+              </Link>
+              .
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Add to Cart Button */}
       <div className="pt-2">
         <Button
@@ -235,7 +299,9 @@ export function ProductVariantSelector({
           ) : (
             <span className="flex items-center gap-2">
               <ShoppingBag className="h-5 w-5" />
-              Add to Cart • {formatPrice(selectedVariant.price)}
+              {quantity > 1
+                ? `Add ${quantity} Pairs to Cart • ${formatPrice(Number(selectedVariant.price) * quantity)}`
+                : `Add to Cart • ${formatPrice(selectedVariant.price)}`}
             </span>
           )}
         </Button>

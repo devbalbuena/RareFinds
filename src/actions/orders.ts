@@ -329,7 +329,8 @@ export async function placeOrderAction(input: PlaceOrderInput) {
             throw new Error(`"${v.product.title}" (${v.size}) was just reserved by another collector.`);
           }
         } else {
-          // COD: Allocate immediately (mark 1-of-1 as isSold=true, decrement stock for normal)
+          // COD: Allocate immediately and set isSold dynamically based on remaining stock
+          const remainingStock = Math.max(0, v.stockQty - item.quantity);
           const updateRes = await tx.productVariant.updateMany({
             where: {
               id: v.id,
@@ -342,8 +343,8 @@ export async function placeOrderAction(input: PlaceOrderInput) {
               ],
             },
             data: {
-              isSold: v.isOneOfOne ? true : false,
-              stockQty: { decrement: item.quantity },
+              isSold: remainingStock <= 0,
+              stockQty: remainingStock,
               reservedUntil: null,
               reservedBy: null,
             },

@@ -719,13 +719,13 @@ export async function updateVariantAction(
     return { error: "Variant not found." };
   }
 
-  // Sold variants cannot have price or condition edited
-  if (existing.isSold) {
+  const isRestocking = input.stockQty !== undefined && input.stockQty > 0;
+  if (existing.isSold && !isRestocking) {
     if (
       (input.price !== undefined && input.price !== Number(existing.price)) ||
       (input.condition !== undefined && input.condition !== existing.condition)
     ) {
-      return { error: "Action blocked: Sold pairs cannot have their price or condition modified." };
+      return { error: "Action blocked: Sold pairs cannot have their price or condition modified without restocking." };
     }
   }
 
@@ -740,6 +740,20 @@ export async function updateVariantAction(
 
   try {
     const updated = await prisma.$transaction(async (tx) => {
+      const targetStock =
+        input.stockQty !== undefined
+          ? input.stockQty
+          : input.isOneOfOne
+          ? 1
+          : existing.stockQty;
+      const isNowSold = targetStock <= 0;
+      const isNowOneOfOne =
+        input.isOneOfOne !== undefined
+          ? input.isOneOfOne
+          : targetStock === 1
+          ? existing.isOneOfOne
+          : false;
+
       const v = await tx.productVariant.update({
         where: { id: variantId },
         data: {
@@ -759,14 +773,9 @@ export async function updateVariantAction(
                 ? new Prisma.Decimal(input.costPrice)
                 : null
               : existing.costPrice,
-          isOneOfOne:
-            input.isOneOfOne !== undefined ? input.isOneOfOne : existing.isOneOfOne,
-          stockQty:
-            input.isOneOfOne || (input.isOneOfOne === undefined && existing.isOneOfOne)
-              ? 1
-              : input.stockQty !== undefined
-              ? input.stockQty
-              : existing.stockQty,
+          isOneOfOne: isNowOneOfOne,
+          stockQty: targetStock,
+          isSold: isNowSold,
         },
       });
 
@@ -911,12 +920,6 @@ export async function adjustVariantStockAction(input: {
         throw new Error("Variant not found.");
       }
 
-      if (variant.isOneOfOne) {
-        throw new Error(
-          "Stock adjustment rejected: 1-of-1 pairs have a locked single-unit allocation and cannot receive quantity adjustments."
-        );
-      }
-
       const newStock = variant.stockQty + input.delta;
       if (newStock < 0) {
         throw new Error(
@@ -928,7 +931,8 @@ export async function adjustVariantStockAction(input: {
         where: { id: input.variantId },
         data: {
           stockQty: newStock,
-          isSold: newStock === 0,
+          isSold: newStock <= 0,
+          isOneOfOne: newStock === 1 ? variant.isOneOfOne : false,
         },
       });
 

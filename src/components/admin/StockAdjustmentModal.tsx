@@ -35,7 +35,7 @@ interface StockAdjustmentModalProps {
   onOpenChange: (open: boolean) => void;
   productTitle: string;
   variants: VariantSummary[];
-  onSuccess?: () => void;
+  onSuccess?: (newStock: number) => void;
 }
 
 const REASONS: { value: StockAdjustmentReason; label: string; description: string }[] = [
@@ -76,11 +76,6 @@ export function StockAdjustmentModal({
     e.preventDefault();
     if (!activeVariantId) return;
 
-    if (isOneOfOne) {
-      setError("1-of-1 grails have fixed allocation and cannot receive quantity adjustments.");
-      return;
-    }
-
     if (quantity <= 0) {
       setError("Please enter a valid quantity greater than 0.");
       return;
@@ -106,11 +101,12 @@ export function StockAdjustmentModal({
       if (res.error) {
         setError(res.error);
       } else {
-        setSuccessMsg(`Inventory updated! New stock for ${selectedVariant?.size}: ${res.newStock} pair(s).`);
+        const resultingStock = res.newStock ?? projectedStock;
+        setSuccessMsg(`Inventory updated! New stock for ${selectedVariant?.size}: ${resultingStock} pair(s).`);
         setTimeout(() => {
           onOpenChange(false);
           setSuccessMsg(null);
-          onSuccess?.();
+          onSuccess?.(resultingStock);
         }, 1200);
       }
     } catch (err: unknown) {
@@ -167,107 +163,105 @@ export function StockAdjustmentModal({
             </select>
           </div>
 
-          {isOneOfOne ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              <p className="font-bold">Fixed 1-of-1 Allocation</p>
-              <p className="text-[11px] text-zinc-600 mt-1">
-                This pair is configured as a unique 1-of-1 grail. Its quantity is locked to 1. Quantity adjustments are disabled.
+          {isOneOfOne && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900">
+              <p className="font-bold">Vault Allocation Notice</p>
+              <p className="text-[11px] text-zinc-600 mt-0.5">
+                Adding units will increase available vault stock and automatically make this sneaker purchasable on the collector storefront.
               </p>
             </div>
-          ) : (
-            <>
-              {/* Add vs Remove toggle */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
-                  Adjustment Type
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setDeltaType("add")}
-                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-bold transition-all ${
-                      deltaType === "add"
-                        ? "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-xs"
-                        : "border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900"
-                    }`}
-                  >
-                    <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> + Increase Stock
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeltaType("remove")}
-                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-bold transition-all ${
-                      deltaType === "remove"
-                        ? "border-rose-300 bg-rose-50 text-rose-800 shadow-xs"
-                        : "border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900"
-                    }`}
-                  >
-                    <TrendingDown className="h-3.5 w-3.5 text-rose-600" /> - Decrease Stock
-                  </button>
-                </div>
-              </div>
-
-              {/* Quantity input & Preview */}
-              <div className="grid grid-cols-2 gap-3 items-center">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
-                    Units ({deltaType === "add" ? "+" : "-"})
-                  </label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="bg-white border-zinc-300 text-zinc-900"
-                  />
-                </div>
-
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-2.5 text-center">
-                  <span className="text-[10px] text-zinc-500 block uppercase font-bold">
-                    Projected Stock
-                  </span>
-                  <span
-                    className={`text-base font-black ${
-                      projectedStock < 0 ? "text-rose-600" : "text-zinc-900"
-                    }`}
-                  >
-                    {currentStock} → {projectedStock}
-                  </span>
-                </div>
-              </div>
-
-              {/* Reason */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
-                  Adjustment Reason
-                </label>
-                <select
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value as StockAdjustmentReason)}
-                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-amber-500 font-medium"
-                >
-                  {REASONS.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Internal Notes */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
-                  Notes / Audit Trail Details (Optional)
-                </label>
-                <Input
-                  placeholder="e.g. Supplier PO #4092 or shelf count discrepancy"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="bg-white border-zinc-300 text-xs text-zinc-900 placeholder:text-zinc-400"
-                />
-              </div>
-            </>
           )}
+
+          {/* Add vs Remove toggle */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
+              Adjustment Type
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setDeltaType("add")}
+                className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-bold transition-all ${
+                  deltaType === "add"
+                    ? "border-emerald-300 bg-emerald-50 text-emerald-800 shadow-xs"
+                    : "border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-600" /> + Increase Stock
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeltaType("remove")}
+                className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-bold transition-all ${
+                  deltaType === "remove"
+                    ? "border-rose-300 bg-rose-50 text-rose-800 shadow-xs"
+                    : "border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900"
+                }`}
+              >
+                <TrendingDown className="h-3.5 w-3.5 text-rose-600" /> - Decrease Stock
+              </button>
+            </div>
+          </div>
+
+          {/* Quantity input & Preview */}
+          <div className="grid grid-cols-2 gap-3 items-center">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
+                Units ({deltaType === "add" ? "+" : "-"})
+              </label>
+              <Input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                className="bg-white border-zinc-300 text-zinc-900"
+              />
+            </div>
+
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-2.5 text-center">
+              <span className="text-[10px] text-zinc-500 block uppercase font-bold">
+                Projected Stock
+              </span>
+              <span
+                className={`text-base font-black ${
+                  projectedStock < 0 ? "text-rose-600" : "text-zinc-900"
+                }`}
+              >
+                {currentStock} → {projectedStock}
+              </span>
+            </div>
+          </div>
+
+          {/* Reason */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
+              Adjustment Reason
+            </label>
+            <select
+              value={reason}
+              onChange={(e) => setReason(e.target.value as StockAdjustmentReason)}
+              className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-xs text-zinc-900 focus:outline-none focus:border-amber-500 font-medium"
+            >
+              {REASONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Internal Notes */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-700">
+              Notes / Audit Trail Details (Optional)
+            </label>
+            <Input
+              placeholder="e.g. Supplier delivery or restock allocation"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="bg-white border-zinc-300 text-xs text-zinc-900 placeholder:text-zinc-400"
+            />
+          </div>
 
           <DialogFooter className="pt-2">
             <Button
@@ -282,8 +276,8 @@ export function StockAdjustmentModal({
             <Button
               type="submit"
               size="sm"
-              disabled={loading || isOneOfOne || projectedStock < 0}
-              className="bg-amber-500 hover:bg-amber-600 text-black font-bold shadow-xs"
+              disabled={loading || projectedStock < 0}
+              className="bg-amber-500 hover:bg-amber-600 text-black font-bold shadow-xs cursor-pointer"
             >
               {loading && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               Save Adjustment
