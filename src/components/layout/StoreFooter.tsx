@@ -129,6 +129,14 @@ export async function StoreFooter() {
           </p>
           <p className="text-xs font-mono text-zinc-300">{settings.contactEmail}</p>
           <p className="text-xs font-mono text-zinc-400 mt-1">{settings.contactPhone}</p>
+          <div className="pt-3">
+            <Link
+              href="/shipping-policy"
+              className="text-xs text-amber-400 hover:text-amber-300 underline underline-offset-4 font-semibold"
+            >
+              Vault Delivery &amp; Authenticity Policy &rarr;
+            </Link>
+          </div>
         </div>
       </div>
 

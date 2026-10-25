@@ -937,7 +937,14 @@ export function CheckoutForm({
                 </div>
                 <p className="leading-relaxed">
                   Every sneaker is inspected in Manila. Exact 1-of-1 pair photographed is shipped
-                  double-boxed with serialized authenticity seal.
+                  double-boxed with serialized authenticity seal.{" "}
+                  <Link
+                    href="/shipping-policy"
+                    target="_blank"
+                    className="underline text-primary font-semibold hover:text-primary/80"
+                  >
+                    View Vault Delivery Policy &rarr;
+                  </Link>
                 </p>
               </div>
 
