@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   LogOut,
   ShieldAlert,
+  CircleDollarSign,
 } from "lucide-react";
 import { Role } from "@prisma/client";
 import { can, Permission } from "@/lib/permissions";
@@ -46,6 +47,12 @@ const NAV_ITEMS: NavItem[] = [
     href: "/admin/orders",
     icon: ShoppingBag,
     permission: "order:view",
+  },
+  {
+    label: "Finance Ledger",
+    href: "/admin/finance",
+    icon: CircleDollarSign,
+    permission: "finance:view",
   },
   {
     label: "Inventory & Stock",

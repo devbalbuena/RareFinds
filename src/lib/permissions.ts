@@ -27,7 +27,9 @@ export type Permission =
   // Brand & Category Catalog (ADMIN only)
   | "catalog:manage"
   // Audit Trail (ADMIN only)
-  | "audit:view";
+  | "audit:view"
+  // Finance & Revenue Command Center (ADMIN only)
+  | "finance:view";
 
 /**
  * Single source of truth for Role-to-Permission mapping.
@@ -66,6 +68,7 @@ const ROLE_PERMISSIONS: Record<Role, Set<Permission>> = {
     "settings:update",
     "catalog:manage",
     "audit:view",
+    "finance:view",
   ]),
 };
 
