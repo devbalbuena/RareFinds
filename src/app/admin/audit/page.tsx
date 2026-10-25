@@ -44,10 +44,16 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
       case "ROLE_CHANGE":
         return "bg-purple-50 text-purple-800 border-purple-200";
       case "USER_DEACTIVATED":
+      case "ORDER_CANCELLED":
+      case "MANUAL_PAYMENT_REJECTED":
         return "bg-rose-50 text-rose-800 border-rose-200";
       case "USER_ACTIVATED":
+      case "ORDER_QC_CONFIRMED":
+      case "ORDER_DELIVERED":
+      case "MANUAL_PAYMENT_APPROVED":
         return "bg-emerald-50 text-emerald-800 border-emerald-200";
       case "SETTINGS_UPDATED":
+      case "COD_REMITTANCE_SETTLED":
         return "bg-amber-50 text-amber-800 border-amber-200";
       case "ORDER_STATUS_UPDATED":
       case "ORDER_DISPATCHED":
@@ -55,6 +61,89 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
       default:
         return "bg-zinc-100 text-zinc-700 border-zinc-200";
     }
+  };
+
+  const renderAuditSummary = (log: typeof logs[0]) => {
+    if (!log.details) return <span className="text-zinc-400">—</span>;
+    const d = log.details as Record<string, unknown>;
+
+    if (log.action === "ORDER_QC_CONFIRMED") {
+      return (
+        <span className="font-sans text-xs text-emerald-700 font-semibold">
+          QC Passed • {String(d.orderNumber || "")} &rarr; PROCESSING
+        </span>
+      );
+    }
+
+    if (log.action === "ORDER_STATUS_UPDATED") {
+      return (
+        <span className="font-sans text-xs text-indigo-700 font-medium">
+          {String(d.orderNumber || "")}: {String(d.previousStatus || "")} &rarr; {String(d.newStatus || "")}
+        </span>
+      );
+    }
+
+    if (log.action === "MANUAL_PAYMENT_APPROVED") {
+      return (
+        <span className="font-sans text-xs text-emerald-700 font-semibold">
+          Payment Verified • ₱{Number(d.totalAmount || 0).toLocaleString("en-PH")}
+        </span>
+      );
+    }
+
+    if (log.action === "MANUAL_PAYMENT_REJECTED") {
+      return (
+        <span className="font-sans text-xs text-rose-700 font-semibold">
+          Rejected: {String(d.reason || "Proof invalid")}
+        </span>
+      );
+    }
+
+    if (log.action === "COD_REMITTANCE_SETTLED") {
+      return (
+        <span className="font-sans text-xs text-amber-700 font-semibold">
+          Remitted ₱{Number(d.amount || 0).toLocaleString("en-PH")} (Ref: {String(d.reference || "")})
+        </span>
+      );
+    }
+
+    if (log.action === "ORDER_DELIVERED") {
+      return (
+        <span className="font-sans text-xs text-emerald-700 font-semibold">
+          Order Delivered • {String(d.orderNumber || "")} ({String(d.deliveryMethod || "")})
+        </span>
+      );
+    }
+
+    if (log.action === "ORDER_TRACKING_UPDATED") {
+      return (
+        <span className="font-sans text-xs text-blue-700 font-medium">
+          Tracking: {String(d.shippingCarrier || "")} #{String(d.trackingNumber || "")}
+        </span>
+      );
+    }
+
+    if (log.action === "SETTINGS_UPDATED") {
+      return (
+        <span className="font-sans text-xs text-amber-800 font-medium">
+          Store Config Modified
+        </span>
+      );
+    }
+
+    if (log.action === "ORDER_CANCELLED") {
+      return (
+        <span className="font-sans text-xs text-rose-700 font-semibold">
+          Cancelled: {String(d.reason || "Staff cancellation")}
+        </span>
+      );
+    }
+
+    return (
+      <span className="truncate block font-mono text-[10px] text-zinc-600" title={JSON.stringify(d, null, 2)}>
+        {JSON.stringify(d)}
+      </span>
+    );
   };
 
   return (
@@ -148,14 +237,8 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
                         )}
                       </td>
 
-                      <td className="py-3 px-4 max-w-xs truncate text-zinc-700 font-mono text-[10px]">
-                        {log.details ? (
-                          <span title={JSON.stringify(log.details, null, 2)}>
-                            {JSON.stringify(log.details)}
-                          </span>
-                        ) : (
-                          <span className="text-zinc-400">—</span>
-                        )}
+                      <td className="py-3 px-4 max-w-sm truncate text-zinc-700">
+                        {renderAuditSummary(log)}
                       </td>
                     </tr>
                   );
