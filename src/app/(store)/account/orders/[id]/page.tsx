@@ -7,6 +7,7 @@ import prisma from "@/lib/prisma";
 import { checkAndExpireOrder } from "@/lib/orders/expiry";
 import { OrderSuccessActions } from "@/components/orders/OrderSuccessActions";
 import { OrderTrackingTimeline } from "@/components/orders/OrderTrackingTimeline";
+import { CustomerVaultReceipt } from "@/components/orders/CustomerVaultReceipt";
 import { getStoreSettings } from "@/lib/settings";
 import { can } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -156,12 +157,40 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
             </p>
           </div>
 
-          <Button asChild variant="outline" size="sm" className="text-xs">
-            <Link href="/account/orders">
-              <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-              Back to All Orders
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <CustomerVaultReceipt
+              orderNumber={order.orderNumber}
+              createdAt={order.createdAt.toISOString()}
+              status={order.status}
+              paymentMethod={order.paymentMethod}
+              deliveryMethod={order.deliveryMethod}
+              customerName={address?.fullName || order.customerName || "Collector"}
+              customerEmail={order.customerEmail}
+              customerPhone={address?.phone || order.customerPhone || undefined}
+              shippingAddress={address || {}}
+              items={order.items.map((i) => ({
+                id: i.id,
+                productTitle: i.productTitle,
+                variantDetails: i.variantDetails,
+                quantity: i.quantity,
+                unitPrice: Number(i.unitPrice),
+                subtotal: Number(i.subtotal),
+              }))}
+              subtotal={Number(order.subtotal)}
+              shippingFee={Number(order.shippingFee)}
+              totalAmount={Number(order.totalAmount)}
+              currencySymbol={storeSettings.currencySymbol}
+              storeName={storeSettings.storeName}
+              qcVerifiedAt={order.qcVerifiedAt ? order.qcVerifiedAt.toISOString() : null}
+            />
+
+            <Button asChild variant="outline" size="sm" className="text-xs">
+              <Link href="/account/orders">
+                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                Back to All Orders
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
 
