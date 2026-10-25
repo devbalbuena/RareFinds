@@ -8,6 +8,7 @@ import { checkAndExpireOrder } from "@/lib/orders/expiry";
 import { OrderSuccessActions } from "@/components/orders/OrderSuccessActions";
 import { OrderTrackingTimeline } from "@/components/orders/OrderTrackingTimeline";
 import { CustomerVaultReceipt } from "@/components/orders/CustomerVaultReceipt";
+import { ManualPaymentProofDropzone } from "@/components/orders/ManualPaymentProofDropzone";
 import { getStoreSettings } from "@/lib/settings";
 import { can } from "@/lib/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -203,6 +204,18 @@ export default async function OrderDetailPage(props: OrderDetailPageProps) {
         paymentMethod={order.paymentMethod}
         expiresAt={order.expiresAt ? order.expiresAt.toISOString() : null}
       />
+
+      {/* Manual Bank / GCash Transfer Receipt Dropzone */}
+      {order.paymentMethod === "MANUAL_TRANSFER" && (
+        <ManualPaymentProofDropzone
+          orderId={order.id}
+          orderNumber={order.orderNumber}
+          initialProofKey={order.paymentProofKey}
+          uploadedAt={order.paymentProofUploadedAt ? order.paymentProofUploadedAt.toISOString() : null}
+          instructions={storeSettings.manualPaymentInstructions}
+          expiresAt={order.expiresAt ? order.expiresAt.toISOString() : null}
+        />
+      )}
 
       {/* Live Visual Courier Tracking Timeline */}
       <OrderTrackingTimeline

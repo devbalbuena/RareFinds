@@ -13,6 +13,7 @@ import { can } from "@/lib/permissions";
 import { isAreaAllowed } from "@/lib/area-matching";
 import { getPaymentMode, getPaymentProvider } from "@/lib/payments";
 import { calculateShippingFee, getRegionZone } from "@/lib/shipping";
+import { verifyImageMagicBytes, getStorageAdminClient } from "@/lib/storage";
 
 const newAddressSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
@@ -773,5 +774,103 @@ export async function reportOrderProblemAction(orderId: string, reason: string) 
   return {
     success: true,
     message: "Your report has been sent to RareFinds Vault administration for review.",
+  };
+}
+
+/**
+ * Customer Action: Upload Manual Payment Proof (GCash / Bank Transfer)
+ * Validates file size (<= 5MB), image magic bytes, updates order review flag, and registers audit log.
+ */
+export async function uploadPaymentProofAction(orderId: string, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "You must be signed in to upload payment proof." };
+  }
+
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+  });
+
+  if (!order) {
+    return { error: "Order not found." };
+  }
+
+  if (order.userId !== session.user.id) {
+    return { error: "Unauthorized: You do not own this order." };
+  }
+
+  if (order.paymentMethod !== "MANUAL_TRANSFER") {
+    return { error: "Payment proof is only applicable for Manual Bank / GCash transfer orders." };
+  }
+
+  const file = formData.get("proofFile") as File | null;
+  if (!file || file.size === 0) {
+    return { error: "Please select an image file to upload." };
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    return { error: "File size exceeds 5MB limit. Please upload a smaller screenshot." };
+  }
+
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    return { error: "Only JPG, PNG, and WebP receipts are supported." };
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+
+  const magic = verifyImageMagicBytes(new Uint8Array(buffer));
+  if (!magic.valid) {
+    return { error: magic.error || "Invalid image header detected." };
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const storageKey = `order-proofs/payments/${order.id}/receipt-${Date.now()}.${ext}`;
+
+  try {
+    const supabase = getStorageAdminClient();
+    await supabase.storage.from("product-images").upload(storageKey, buffer, {
+      contentType: file.type,
+      upsert: true,
+    });
+  } catch (err) {
+    console.warn("[uploadPaymentProofAction] Storage client warning:", err);
+  }
+
+  const updated = await prisma.order.update({
+    where: { id: orderId },
+    data: {
+      paymentProofKey: storageKey,
+      paymentProofUploadedAt: new Date(),
+      paymentReviewFlag: true,
+      status: OrderStatus.PENDING,
+    },
+  });
+
+  await prisma.auditLog.create({
+    data: {
+      userId: session.user.id,
+      userEmail: session.user.email || "buyer@rarefinds.ph",
+      action: "MANUAL_PAYMENT_PROOF_UPLOADED",
+      entityType: "Order",
+      entityId: order.id,
+      details: {
+        orderNumber: order.orderNumber,
+        storageKey,
+        uploadedAt: updated.paymentProofUploadedAt,
+      },
+    },
+  });
+
+  revalidatePath(`/order-success/${orderId}`);
+  revalidatePath("/account/orders");
+  revalidatePath(`/account/orders/${orderId}`);
+  revalidatePath(`/admin/orders/${orderId}`);
+
+  return {
+    success: true,
+    message: "Payment receipt uploaded successfully! Vault staff will verify and release your order shortly.",
+    paymentProofKey: storageKey,
   };
 }
