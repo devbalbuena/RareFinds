@@ -1036,3 +1036,147 @@ export async function cancelOrderAdminAction(orderId: string, reason: string) {
     return { error: msg };
   }
 }
+
+/**
+ * Admin Action: Verify Customer Manual Transfer Payment (Approve or Reject)
+ */
+export async function verifyManualPaymentAction(
+  orderId: string,
+  decision: "APPROVE" | "REJECT",
+  rejectionReason?: string
+) {
+  try {
+    const caller = await verifyAdminSession("order:update-status");
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true },
+    });
+
+    if (!order) {
+      return { error: "Order not found." };
+    }
+
+    if (order.paymentMethod !== "MANUAL_TRANSFER") {
+      return { error: "This action is only valid for Manual Transfer orders." };
+    }
+
+    if (decision === "APPROVE") {
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          paymentStatus: PaymentStatus.PAID,
+          paidAt: new Date(),
+          status:
+            order.status === OrderStatus.PENDING_PAYMENT || order.status === OrderStatus.PENDING
+              ? OrderStatus.PAID
+              : order.status,
+          paymentReviewFlag: false,
+        },
+      });
+
+      // Upsert payment event in payments table
+      await prisma.payment.upsert({
+        where: {
+          orderId_method: {
+            orderId,
+            method: PaymentMethod.MANUAL_TRANSFER,
+          },
+        },
+        create: {
+          orderId,
+          method: PaymentMethod.MANUAL_TRANSFER,
+          amount: order.totalAmount,
+          status: PaymentStatus.PAID,
+          reference: `STAFF-VERIFIED-${Date.now()}`,
+          isSimulated: order.isSimulated,
+          paidAt: new Date(),
+          proofKey: order.paymentProofKey,
+          verifiedById: caller.id,
+        },
+        update: {
+          status: PaymentStatus.PAID,
+          reference: `STAFF-VERIFIED-${Date.now()}`,
+          paidAt: new Date(),
+          proofKey: order.paymentProofKey,
+          verifiedById: caller.id,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          userId: caller.id,
+          userEmail: caller.email,
+          action: "MANUAL_PAYMENT_APPROVED",
+          entityType: "Order",
+          entityId: orderId,
+          details: {
+            orderNumber: order.orderNumber,
+            totalAmount: Number(order.totalAmount),
+            verifiedBy: caller.email,
+          },
+        },
+      });
+    } else {
+      // REJECT
+      const reason =
+        rejectionReason?.trim() || "Manual transfer payment proof rejected by vault staff.";
+      await cancelOrderAdminAction(orderId, reason);
+
+      await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          paymentReviewFlag: false,
+          paymentProofRejections: { increment: 1 },
+        },
+      });
+
+      await prisma.payment.upsert({
+        where: {
+          orderId_method: {
+            orderId,
+            method: PaymentMethod.MANUAL_TRANSFER,
+          },
+        },
+        create: {
+          orderId,
+          method: PaymentMethod.MANUAL_TRANSFER,
+          amount: order.totalAmount,
+          status: PaymentStatus.FAILED,
+          rejectionReason: reason,
+          isSimulated: order.isSimulated,
+          verifiedById: caller.id,
+        },
+        update: {
+          status: PaymentStatus.FAILED,
+          rejectionReason: reason,
+          verifiedById: caller.id,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          userId: caller.id,
+          userEmail: caller.email,
+          action: "MANUAL_PAYMENT_REJECTED",
+          entityType: "Order",
+          entityId: orderId,
+          details: {
+            orderNumber: order.orderNumber,
+            reason,
+            verifiedBy: caller.email,
+          },
+        },
+      });
+    }
+
+    safeRevalidatePath("/admin/orders");
+    safeRevalidatePath(`/admin/orders/${orderId}`);
+    safeRevalidatePath("/account/orders");
+    safeRevalidatePath(`/account/orders/${orderId}`);
+
+    return { success: true, decision };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Failed to process manual payment decision.";
+    return { error: msg };
+  }
+}

@@ -33,6 +33,7 @@ import {
   cancelOrderAdminAction,
   confirmOrderQcAction,
   markOrderDeliveredAction,
+  verifyManualPaymentAction,
   SerializedAdminOrder,
 } from "@/actions/admin-orders";
 import { OrderStatus } from "@prisma/client";
@@ -330,6 +331,40 @@ export function OrderDetailView({
       setFeedback({ type: "error", message: res.error });
     } else {
       setFeedback({ type: "success", message: "Order is now ready for customer pickup!" });
+      router.refresh();
+    }
+  }
+
+  // Quick Action: Verify Manual Transfer Payment (Approve / Reject)
+  async function handleVerifyManualPayment(decision: "APPROVE" | "REJECT") {
+    if (decision === "APPROVE") {
+      if (!confirm("Approve customer's manual transfer receipt and mark this order as PAID?")) {
+        return;
+      }
+    } else {
+      const reason = prompt("Enter reason for rejecting this manual transfer receipt:");
+      if (!reason) return;
+      setIsUpdatingStatus(true);
+      setFeedback(null);
+      const res = await verifyManualPaymentAction(order.id, "REJECT", reason);
+      setIsUpdatingStatus(false);
+      if (res.error) {
+        setFeedback({ type: "error", message: res.error });
+      } else {
+        setFeedback({ type: "success", message: "Manual payment receipt rejected and order cancelled." });
+        router.refresh();
+      }
+      return;
+    }
+
+    setIsUpdatingStatus(true);
+    setFeedback(null);
+    const res = await verifyManualPaymentAction(order.id, "APPROVE");
+    setIsUpdatingStatus(false);
+    if (res.error) {
+      setFeedback({ type: "error", message: res.error });
+    } else {
+      setFeedback({ type: "success", message: "Manual transfer payment approved and marked PAID!" });
       router.refresh();
     }
   }
@@ -1267,6 +1302,60 @@ export function OrderDetailView({
                     <span className="text-zinc-800 font-mono text-[11px]">
                       {new Date(order.paidAt).toLocaleDateString()} {new Date(order.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
+                  </div>
+                )}
+
+                {/* Manual Transfer Verification Controls */}
+                {order.paymentMethod === "MANUAL_TRANSFER" && (
+                  <div className="pt-3 border-t border-zinc-100 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-700 flex items-center gap-1.5">
+                        <CreditCard className="w-3.5 h-3.5 text-amber-500" />
+                        Transfer Slip Audit
+                      </span>
+                      {order.paymentStatus === "PAID" ? (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          VERIFIED
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                          PENDING VERIFICATION
+                        </span>
+                      )}
+                    </div>
+
+                    {order.paymentStatus === "PAID" ? (
+                      <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>Manual transfer receipt verified &amp; approved by staff.</span>
+                      </div>
+                    ) : (
+                      <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 space-y-2 text-xs">
+                        <p className="text-[11px] text-amber-900 leading-relaxed">
+                          Customer selected manual GCash/Bank deposit. Review incoming funds before approving.
+                        </p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyManualPayment("APPROVE")}
+                            disabled={isUpdatingStatus}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-2xs cursor-pointer"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Approve &amp; Mark Paid
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyManualPayment("REJECT")}
+                            disabled={isUpdatingStatus}
+                            className="px-3 py-1.5 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-800 font-semibold text-xs flex items-center gap-1 cursor-pointer"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
