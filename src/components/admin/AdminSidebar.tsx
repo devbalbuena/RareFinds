@@ -35,60 +35,85 @@ interface NavItem {
   permission: Permission;
 }
 
-const NAV_ITEMS: NavItem[] = [
+interface NavCategory {
+  title: string;
+  items: NavItem[];
+}
+
+const NAV_CATEGORIES: NavCategory[] = [
   {
-    label: "Dashboard",
-    href: "/admin",
-    icon: LayoutDashboard,
-    permission: "admin:access",
+    title: "Overview",
+    items: [
+      {
+        label: "Dashboard",
+        href: "/admin",
+        icon: LayoutDashboard,
+        permission: "admin:access",
+      },
+    ],
   },
   {
-    label: "Orders",
-    href: "/admin/orders",
-    icon: ShoppingBag,
-    permission: "order:view",
+    title: "Sales & Operations",
+    items: [
+      {
+        label: "Orders & Fulfillment",
+        href: "/admin/orders",
+        icon: ShoppingBag,
+        permission: "order:view",
+      },
+      {
+        label: "Finance Ledger",
+        href: "/admin/finance",
+        icon: CircleDollarSign,
+        permission: "finance:view",
+      },
+      {
+        label: "Customer Directory",
+        href: "/admin/customers",
+        icon: Users,
+        permission: "customer:view",
+      },
+    ],
   },
   {
-    label: "Finance Ledger",
-    href: "/admin/finance",
-    icon: CircleDollarSign,
-    permission: "finance:view",
+    title: "Vault & Catalog",
+    items: [
+      {
+        label: "Inventory & Stock",
+        href: "/admin/products",
+        icon: Package,
+        permission: "product:view",
+      },
+      {
+        label: "Brands & Categories",
+        href: "/admin/catalog",
+        icon: Tags,
+        permission: "catalog:manage",
+      },
+    ],
   },
   {
-    label: "Inventory & Stock",
-    href: "/admin/products",
-    icon: Package,
-    permission: "product:view",
-  },
-  {
-    label: "Brands & Categories",
-    href: "/admin/catalog",
-    icon: Tags,
-    permission: "catalog:manage",
-  },
-  {
-    label: "Customers",
-    href: "/admin/customers",
-    icon: Users,
-    permission: "customer:view",
-  },
-  {
-    label: "Users & Staff",
-    href: "/admin/users",
-    icon: ShieldAlert,
-    permission: "user:view",
-  },
-  {
-    label: "Store Settings",
-    href: "/admin/settings",
-    icon: Settings,
-    permission: "settings:view",
-  },
-  {
-    label: "Audit Trail",
-    href: "/admin/audit",
-    icon: FileText,
-    permission: "audit:view",
+    title: "System & Governance",
+    items: [
+      {
+        label: "Users & Staff",
+        href: "/admin/users",
+        icon: ShieldAlert,
+        permission: "user:view",
+      },
+      {
+        label: "Store Settings",
+        href: "/admin/settings",
+        icon: Settings,
+        permission: "settings:view",
+      },
+      {
+        label: "Audit Trail",
+        href: "/admin/audit",
+        icon: FileText,
+        permission: "audit:view",
+      },
+    ],
   },
 ];
 
@@ -100,10 +125,11 @@ export function AdminSidebar({
 }: AdminSidebarProps) {
   const pathname = usePathname();
 
-  // Filter navigation items by active database role permissions
-  const visibleNavItems = NAV_ITEMS.filter((item) =>
-    can(userRole, item.permission)
-  );
+  // Filter categories and items by active database role permissions
+  const visibleCategories = NAV_CATEGORIES.map((category) => ({
+    ...category,
+    items: category.items.filter((item) => can(userRole, item.permission)),
+  })).filter((category) => category.items.length > 0);
 
   return (
     <aside className="w-64 bg-white border-r border-zinc-200 flex flex-col shrink-0 min-h-screen text-zinc-700">
@@ -124,37 +150,41 @@ export function AdminSidebar({
         </Link>
       </div>
 
-      {/* Navigation Links */}
-      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
-          Navigation
-        </div>
-        {visibleNavItems.map((item) => {
-          const isActive =
-            item.href === "/admin"
-              ? pathname === "/admin"
-              : pathname.startsWith(item.href);
-          const Icon = item.icon;
+      {/* Categorized Navigation Links */}
+      <nav className="flex-1 px-3 py-4 space-y-5 overflow-y-auto">
+        {visibleCategories.map((category) => (
+          <div key={category.title} className="space-y-1">
+            <div className="px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-zinc-400">
+              {category.title}
+            </div>
+            {category.items.map((item) => {
+              const isActive =
+                item.href === "/admin"
+                  ? pathname === "/admin"
+                  : pathname.startsWith(item.href);
+              const Icon = item.icon;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all ${
-                isActive
-                  ? "bg-amber-500/10 text-amber-900 border border-amber-500/30"
-                  : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 border border-transparent"
-              }`}
-            >
-              <Icon
-                className={`h-4 w-4 ${
-                  isActive ? "text-amber-600" : "text-zinc-400"
-                }`}
-              />
-              <span>{item.label}</span>
-            </Link>
-          );
-        })}
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                    isActive
+                      ? "bg-amber-500/10 text-amber-900 border border-amber-500/30"
+                      : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 border border-transparent"
+                  }`}
+                >
+                  <Icon
+                    className={`h-4 w-4 ${
+                      isActive ? "text-amber-600" : "text-zinc-400"
+                    }`}
+                  />
+                  <span>{item.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       {/* User profile footer */}

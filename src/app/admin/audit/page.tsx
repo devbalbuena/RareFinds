@@ -18,7 +18,7 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
   const params = await searchParams;
 
   const currentPage = Math.max(1, parseInt(params.page || "1", 10) || 1);
-  const pageSize = 15;
+  const pageSize = 10;
   const skip = (currentPage - 1) * pageSize;
 
   const [totalCount, logs] = await Promise.all([
@@ -174,14 +174,14 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
       {/* Read-only Paginated Table */}
       <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[900px] text-left text-xs">
             <thead className="bg-zinc-50/80 border-b border-zinc-200 text-[11px] font-bold uppercase tracking-wider text-zinc-600">
               <tr>
-                <th className="py-3.5 px-4">Timestamp</th>
-                <th className="py-3.5 px-4">Operator</th>
-                <th className="py-3.5 px-4">Action</th>
-                <th className="py-3.5 px-4">Target Entity</th>
-                <th className="py-3.5 px-4">Change Summary</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">Timestamp</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[170px]">Operator</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[150px]">Action</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[130px]">Target Entity</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[250px]">Change Summary</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 font-mono text-[11px]">

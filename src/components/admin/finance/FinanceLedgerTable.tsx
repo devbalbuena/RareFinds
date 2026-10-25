@@ -150,17 +150,17 @@ export function FinanceLedgerTable({ ledger }: FinanceLedgerTableProps) {
 
       {/* Ledger Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs border-collapse">
+        <table className="w-full min-w-[950px] text-left text-xs border-collapse">
           <thead>
             <tr className="bg-zinc-100/60 text-zinc-500 font-semibold uppercase tracking-wider text-[10px] border-b border-zinc-200">
-              <th className="py-3 px-4">Order / ID</th>
-              <th className="py-3 px-4">Customer</th>
-              <th className="py-3 px-4">Payment Method</th>
-              <th className="py-3 px-4">Delivery</th>
-              <th className="py-3 px-4 text-right">Amount (PHP)</th>
-              <th className="py-3 px-4 text-center">Status</th>
-              <th className="py-3 px-4">Date</th>
-              <th className="py-3 px-4 text-center">Action</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[170px]">Order / ID</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[180px]">Customer</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[140px]">Payment Method</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[130px]">Delivery</th>
+              <th className="py-3 px-4 text-right whitespace-nowrap min-w-[120px]">Amount (PHP)</th>
+              <th className="py-3 px-4 text-center whitespace-nowrap min-w-[90px]">Status</th>
+              <th className="py-3 px-4 whitespace-nowrap min-w-[110px]">Date</th>
+              <th className="py-3 px-4 text-center whitespace-nowrap min-w-[80px]">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 font-medium text-zinc-800">
@@ -175,8 +175,8 @@ export function FinanceLedgerTable({ ledger }: FinanceLedgerTableProps) {
             ) : (
               filteredItems.map((item) => (
                 <tr key={item.id} className="hover:bg-zinc-50/70 transition-colors">
-                  <td className="py-3 px-4">
-                    <div className="flex items-center gap-1.5">
+                  <td className="py-3 px-4 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5 whitespace-nowrap">
                       <span className="font-mono font-bold text-zinc-900">{item.orderNumber}</span>
                       {item.isSimulated && (
                         <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 border border-purple-200">
@@ -185,19 +185,19 @@ export function FinanceLedgerTable({ ledger }: FinanceLedgerTableProps) {
                       )}
                     </div>
                     {item.reference && (
-                      <span className="text-[10px] text-zinc-400 font-mono block truncate max-w-[130px]">
+                      <span className="text-[10px] text-zinc-400 font-mono block whitespace-nowrap truncate max-w-[200px]">
                         Ref: {item.reference}
                       </span>
                     )}
                   </td>
 
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-4 whitespace-nowrap">
                     <div className="font-semibold text-zinc-900">{item.customerName}</div>
-                    <div className="text-[10px] text-zinc-500 truncate max-w-[160px]">{item.customerEmail}</div>
+                    <div className="text-[10px] text-zinc-500 whitespace-nowrap">{item.customerEmail}</div>
                   </td>
 
-                  <td className="py-3 px-4">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-100 text-zinc-800 border border-zinc-200">
+                  <td className="py-3 px-4 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-zinc-100 text-zinc-800 border border-zinc-200 whitespace-nowrap">
                       {item.paymentMethod === "COD" && "Cash on Delivery"}
                       {item.paymentMethod === "GCASH" && "GCash"}
                       {item.paymentMethod === "PAYMAYA" && "Maya"}
@@ -207,8 +207,8 @@ export function FinanceLedgerTable({ ledger }: FinanceLedgerTableProps) {
                     </span>
                   </td>
 
-                  <td className="py-3 px-4 text-zinc-600">
-                    <div className="flex items-center gap-1 text-[11px]">
+                  <td className="py-3 px-4 whitespace-nowrap text-zinc-600">
+                    <div className="flex items-center gap-1 text-[11px] whitespace-nowrap">
                       {item.deliveryMethod === "LOCAL_EXPRESS" && (
                         <span className="flex items-center gap-1 text-emerald-700 font-semibold">
                           <Truck className="w-3 h-3 text-emerald-600" />

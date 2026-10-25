@@ -451,16 +451,16 @@ export function OrderManagementTable({
       {/* Orders Table */}
       <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[950px] text-left text-xs">
             <thead className="border-b border-zinc-200 bg-zinc-50/80 text-zinc-600 uppercase tracking-wider text-[11px] font-bold">
               <tr>
-                <th className="py-3.5 px-4">Order # &amp; Date</th>
-                <th className="py-3.5 px-4">Customer</th>
-                <th className="py-3.5 px-4">Items</th>
-                <th className="py-3.5 px-4">Total Amount</th>
-                <th className="py-3.5 px-4">Status</th>
-                <th className="py-3.5 px-4">Courier &amp; Tracking</th>
-                <th className="py-3.5 px-4 text-right">Actions</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[170px]">Order # &amp; Date</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[180px]">Customer</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[190px]">Items</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[110px]">Total Amount</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[100px]">Status</th>
+                <th className="py-3.5 px-4 whitespace-nowrap min-w-[140px]">Courier &amp; Tracking</th>
+                <th className="py-3.5 px-4 text-right whitespace-nowrap min-w-[110px]">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100">
@@ -495,15 +495,15 @@ export function OrderManagementTable({
                       className="hover:bg-zinc-50/70 transition-colors group"
                     >
                       {/* Order Number & Timestamp */}
-                      <td className="py-3.5 px-4 align-top">
-                        <div className="space-y-0.5">
+                      <td className="py-3.5 px-4 align-top whitespace-nowrap">
+                        <div className="space-y-0.5 whitespace-nowrap">
                           <Link
                             href={`/admin/orders/${order.id}`}
-                            className="font-bold text-zinc-900 hover:text-amber-600 font-mono text-xs transition-colors block"
+                            className="font-bold text-zinc-900 hover:text-amber-600 font-mono text-xs transition-colors whitespace-nowrap inline-block"
                           >
                             {order.orderNumber}
                           </Link>
-                          <span className="text-[11px] text-zinc-500 block">
+                          <span className="text-[11px] text-zinc-500 block whitespace-nowrap">
                             {dateStr} • {timeStr}
                           </span>
                         </div>
