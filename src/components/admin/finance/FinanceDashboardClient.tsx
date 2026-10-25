@@ -14,7 +14,11 @@ import {
   CheckCircle2,
   Clock,
 } from "lucide-react";
-import { FinanceOverviewData, getFinanceDataAction } from "@/actions/finance";
+import {
+  FinanceOverviewData,
+  getFinanceDataAction,
+  reconcileCodPaymentAction,
+} from "@/actions/finance";
 import { FinanceLedgerTable } from "./FinanceLedgerTable";
 
 interface FinanceDashboardClientProps {
@@ -25,6 +29,37 @@ export function FinanceDashboardClient({ initialData }: FinanceDashboardClientPr
   const [data, setData] = React.useState<FinanceOverviewData>(initialData);
   const [includeSimulated, setIncludeSimulated] = React.useState(true);
   const [isLoading, setIsLoading] = React.useState(false);
+  const [reconcilingId, setReconcilingId] = React.useState<string | null>(null);
+  const [remitSuccessMsg, setRemitSuccessMsg] = React.useState<string | null>(null);
+
+  async function handleReconcileCod(orderId: string, orderNumber: string) {
+    const ref = prompt(`Confirm remittance receipt for COD Order #${orderNumber}.\nEnter Courier Remittance Receipt Ref (or leave empty for auto):`);
+    if (ref === null) return;
+
+    setReconcilingId(orderId);
+    setRemitSuccessMsg(null);
+    const res = await reconcileCodPaymentAction(orderId, ref);
+    if (res.error) {
+      alert(res.error);
+    } else {
+      setRemitSuccessMsg(`Successfully settled COD remittance for ${orderNumber}!`);
+      // Refresh data
+      const updated = await getFinanceDataAction({ includeSimulated });
+      if (updated.data) setData(updated.data);
+    }
+    setReconcilingId(null);
+  }
+
+  const { metrics, paymentMethodBreakdown, deliveryMethodBreakdown, ledger } = data;
+
+  const pendingCodOrders = React.useMemo(() => {
+    return ledger.filter(
+      (item) =>
+        item.paymentMethod === "COD" &&
+        item.paymentStatus !== "PAID" &&
+        item.status !== "CANCELLED"
+    );
+  }, [ledger]);
 
   async function handleToggleSimulated(newVal: boolean) {
     setIncludeSimulated(newVal);
@@ -35,8 +70,6 @@ export function FinanceDashboardClient({ initialData }: FinanceDashboardClientPr
       setData(res.data);
     }
   }
-
-  const { metrics, paymentMethodBreakdown, deliveryMethodBreakdown, ledger } = data;
 
   return (
     <div className="space-y-6">
@@ -156,6 +189,78 @@ export function FinanceDashboardClient({ initialData }: FinanceDashboardClientPr
           </div>
         </div>
       </div>
+
+      {/* Success notification banner */}
+      {remitSuccessMsg && (
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>{remitSuccessMsg}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setRemitSuccessMsg(null)}
+            className="text-emerald-700 hover:text-emerald-900 cursor-pointer font-bold"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Dedicated COD Cash Remittance Pipeline */}
+      {pendingCodOrders.length > 0 && (
+        <div className="p-5 rounded-2xl bg-amber-50/70 border border-amber-200 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Truck className="w-4 h-4 text-amber-600" />
+              <h2 className="text-sm font-bold text-amber-950">
+                Active COD Remittance Pipeline ({pendingCodOrders.length} orders awaiting settlement)
+              </h2>
+            </div>
+            <span className="text-xs font-bold text-amber-800">
+              Total Pending Courier Cash: ₱
+              {pendingCodOrders
+                .reduce((acc, curr) => acc + curr.amount, 0)
+                .toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          <p className="text-xs text-amber-900/80">
+            Couriers collect cash upon doorstep handover. When the driver or courier company deposits or remits the cash to the store vault, click below to reconcile.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
+            {pendingCodOrders.slice(0, 6).map((order) => (
+              <div
+                key={order.id}
+                className="p-3 bg-white rounded-xl border border-amber-200/90 shadow-2xs flex flex-col justify-between gap-2"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono font-bold text-zinc-900 text-xs">{order.orderNumber}</span>
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">
+                      {order.status}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-zinc-600 mt-1 truncate">{order.customerName}</div>
+                  <div className="text-xs font-black text-zinc-900 mt-0.5">
+                    ₱{order.amount.toLocaleString("en-PH", { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleReconcileCod(order.orderId, order.orderNumber)}
+                  disabled={reconcilingId === order.orderId}
+                  className="w-full py-1.5 px-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{reconcilingId === order.orderId ? "Settling..." : "Reconcile Cash Remittance"}</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Payment & Delivery Breakdown Grids */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">

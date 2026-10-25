@@ -209,3 +209,88 @@ export async function getFinanceDataAction(
     return { error: msg };
   }
 }
+
+/**
+ * Admin Action: Reconcile / Remit Courier COD Cash to Vault
+ */
+export async function reconcileCodPaymentAction(
+  orderId: string,
+  remittanceRef?: string
+): Promise<{ success?: boolean; error?: string }> {
+  try {
+    const caller = await verifyAdminSession("finance:view");
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) {
+      return { error: "Order not found." };
+    }
+
+    if (order.paymentMethod !== PaymentMethod.COD) {
+      return { error: "Order is not a Cash on Delivery order." };
+    }
+
+    if (order.paymentStatus === PaymentStatus.PAID) {
+      return { error: "This order is already marked as settled/paid." };
+    }
+
+    const ref = remittanceRef?.trim() || `COD-REMIT-${Date.now()}`;
+
+    await prisma.order.update({
+      where: { id: orderId },
+      data: {
+        paymentStatus: PaymentStatus.PAID,
+        paidAt: new Date(),
+        paymentReference: ref,
+      },
+    });
+
+    await prisma.payment.upsert({
+      where: {
+        orderId_method: {
+          orderId,
+          method: PaymentMethod.COD,
+        },
+      },
+      create: {
+        orderId,
+        method: PaymentMethod.COD,
+        amount: order.totalAmount,
+        status: PaymentStatus.PAID,
+        reference: ref,
+        isSimulated: order.isSimulated,
+        paidAt: new Date(),
+        verifiedById: caller.id,
+      },
+      update: {
+        status: PaymentStatus.PAID,
+        reference: ref,
+        paidAt: new Date(),
+        verifiedById: caller.id,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId: caller.id,
+        userEmail: caller.email,
+        action: "COD_REMITTANCE_SETTLED",
+        entityType: "Order",
+        entityId: orderId,
+        details: {
+          orderNumber: order.orderNumber,
+          amount: Number(order.totalAmount),
+          reference: ref,
+          settledBy: caller.email,
+        },
+      },
+    });
+
+    return { success: true };
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Failed to reconcile COD payment.";
+    return { error: msg };
+  }
+}
