@@ -100,6 +100,73 @@ export async function createAddressAction(prevState: unknown, formData: FormData
   }
 }
 
+export async function updateAddressAction(prevState: unknown, formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { error: "You must be signed in to update addresses." };
+  }
+
+  const addressId = formData.get("addressId");
+  if (!addressId || typeof addressId !== "string") {
+    return { error: "Invalid address ID." };
+  }
+
+  const rawData = {
+    fullName: formData.get("fullName"),
+    phone: formData.get("phone"),
+    street: formData.get("street"),
+    apartment: formData.get("apartment") || undefined,
+    city: formData.get("city"),
+    province: formData.get("province"),
+    postalCode: formData.get("postalCode"),
+    isDefault: formData.get("isDefault") === "on" || formData.get("isDefault") === "true",
+  };
+
+  const validated = addressSchema.safeParse(rawData);
+  if (!validated.success) {
+    return { error: validated.error.issues[0]?.message || "Invalid address data." };
+  }
+
+  const userId = session.user.id;
+  const data = validated.data;
+
+  try {
+    const existing = await prisma.address.findFirst({
+      where: { id: addressId, userId },
+    });
+    if (!existing) {
+      return { error: "Address not found." };
+    }
+
+    if (data.isDefault) {
+      await prisma.address.updateMany({
+        where: { userId },
+        data: { isDefault: false },
+      });
+    }
+
+    await prisma.address.update({
+      where: { id: addressId },
+      data: {
+        fullName: data.fullName,
+        phone: data.phone,
+        street: data.street,
+        apartment: data.apartment || null,
+        city: data.city,
+        province: data.province,
+        postalCode: data.postalCode,
+        isDefault: data.isDefault !== undefined ? data.isDefault : existing.isDefault,
+      },
+    });
+
+    revalidatePath("/account");
+    return { success: true, message: "Shipping address updated successfully." };
+  } catch (error) {
+    console.error("updateAddress error:", error);
+    return { error: "Failed to update address. Please try again." };
+  }
+}
+
 export async function deleteAddressAction(addressId: string) {
   const session = await auth();
   if (!session?.user?.id) {
