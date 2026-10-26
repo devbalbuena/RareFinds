@@ -1,17 +1,29 @@
 import { verifyAdminSession } from "@/lib/admin-auth";
 import prisma from "@/lib/prisma";
-import { FileText, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { FileText, ArrowLeft, ChevronLeft, ChevronRight, Search, X, Filter } from "lucide-react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
 interface AuditPageProps {
   searchParams: Promise<{
     page?: string;
+    action?: string;
+    search?: string;
   }>;
 }
+
+const FILTER_CATEGORIES = [
+  { label: "All Events", value: "ALL" },
+  { label: "Orders & Fulfillment", value: "ORDERS" },
+  { label: "Payments", value: "PAYMENTS" },
+  { label: "Inventory", value: "STOCK" },
+  { label: "Users & Staff", value: "USERS" },
+  { label: "Settings", value: "SETTINGS" },
+];
 
 export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
   await verifyAdminSession("audit:view");
@@ -21,9 +33,50 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
   const pageSize = 10;
   const skip = (currentPage - 1) * pageSize;
 
+  const currentAction = params.action || "ALL";
+  const currentSearch = params.search?.trim() || "";
+
+  // Build filter where clause
+  const where: Prisma.AuditLogWhereInput = {};
+
+  if (currentAction !== "ALL") {
+    if (currentAction === "ORDERS") {
+      where.action = { startsWith: "ORDER_" };
+    } else if (currentAction === "PAYMENTS") {
+      where.action = {
+        in: [
+          "MANUAL_PAYMENT_APPROVED",
+          "MANUAL_PAYMENT_REJECTED",
+          "COD_REMITTANCE_SETTLED",
+        ],
+      };
+    } else if (currentAction === "STOCK") {
+      where.action = {
+        in: ["STOCK_ADJUSTED", "STOCK_ADDED", "STOCK_REDUCED"],
+      };
+    } else if (currentAction === "USERS") {
+      where.action = {
+        in: ["USER_CREATED", "USER_ACTIVATED", "USER_DEACTIVATED", "ROLE_CHANGE"],
+      };
+    } else if (currentAction === "SETTINGS") {
+      where.action = "SETTINGS_UPDATED";
+    } else {
+      where.action = currentAction;
+    }
+  }
+
+  if (currentSearch) {
+    where.OR = [
+      { userEmail: { contains: currentSearch, mode: "insensitive" } },
+      { entityId: { contains: currentSearch, mode: "insensitive" } },
+      { action: { contains: currentSearch, mode: "insensitive" } },
+    ];
+  }
+
   const [totalCount, logs] = await Promise.all([
-    prisma.auditLog.count(),
+    prisma.auditLog.count({ where }),
     prisma.auditLog.findMany({
+      where,
       take: pageSize,
       skip,
       orderBy: { createdAt: "desc" },
@@ -146,6 +199,21 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
     );
   };
 
+  const buildFilterLink = (actionKey: string) => {
+    const q = new URLSearchParams();
+    if (actionKey !== "ALL") q.set("action", actionKey);
+    if (currentSearch) q.set("search", currentSearch);
+    return `/admin/audit${q.toString() ? `?${q.toString()}` : ""}`;
+  };
+
+  const buildPageLink = (pageNumber: number) => {
+    const q = new URLSearchParams();
+    q.set("page", String(pageNumber));
+    if (currentAction !== "ALL") q.set("action", currentAction);
+    if (currentSearch) q.set("search", currentSearch);
+    return `/admin/audit?${q.toString()}`;
+  };
+
   return (
     <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-6 text-zinc-900">
       <div className="flex items-center gap-2 text-xs text-zinc-500">
@@ -169,6 +237,61 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
         <div className="text-xs font-mono text-zinc-500">
           Total Recorded Actions: <strong className="text-zinc-900">{totalCount}</strong>
         </div>
+      </div>
+
+      {/* Action Category Filters & Search Toolbar */}
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {FILTER_CATEGORIES.map((cat) => {
+            const isSelected = currentAction === cat.value;
+            return (
+              <Link
+                key={cat.value}
+                href={buildFilterLink(cat.value)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 ${
+                  isSelected
+                    ? "bg-zinc-900 text-white shadow-xs"
+                    : "bg-white text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 border border-zinc-200 shadow-2xs"
+                }`}
+              >
+                <span>{cat.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        {/* Search Bar */}
+        <form method="GET" action="/admin/audit" className="flex items-center gap-2">
+          {currentAction !== "ALL" && (
+            <input type="hidden" name="action" value={currentAction} />
+          )}
+          <div className="relative flex-1 sm:w-72">
+            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-400" />
+            <input
+              type="text"
+              name="search"
+              defaultValue={currentSearch}
+              placeholder="Search user email, target ID, action..."
+              className="w-full pl-8 pr-8 py-1.5 rounded-xl border border-zinc-200 bg-white text-xs text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-amber-500 shadow-2xs"
+            />
+            {currentSearch && (
+              <Link
+                href={buildFilterLink(currentAction)}
+                className="absolute right-2.5 top-2 text-zinc-400 hover:text-zinc-700"
+                title="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
+          <button
+            type="submit"
+            className="px-3 py-1.5 rounded-xl bg-zinc-900 text-white hover:bg-zinc-800 text-xs font-semibold shadow-2xs transition"
+          >
+            Search
+          </button>
+        </form>
       </div>
 
       {/* Read-only Paginated Table */}
@@ -265,7 +388,7 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
                 className="h-8 border-zinc-200 bg-white text-zinc-700 text-xs gap-1 shadow-2xs"
               >
                 <Link
-                  href={`/admin/audit?page=${currentPage - 1}`}
+                  href={buildPageLink(currentPage - 1)}
                   aria-disabled={currentPage <= 1}
                 >
                   <ChevronLeft className="h-3.5 w-3.5" />
@@ -281,7 +404,7 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
                 className="h-8 border-zinc-200 bg-white text-zinc-700 text-xs gap-1 shadow-2xs"
               >
                 <Link
-                  href={`/admin/audit?page=${currentPage + 1}`}
+                  href={buildPageLink(currentPage + 1)}
                   aria-disabled={currentPage >= totalPages}
                 >
                   <span>Next</span>
