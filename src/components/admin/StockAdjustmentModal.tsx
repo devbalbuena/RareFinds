@@ -64,6 +64,22 @@ export function StockAdjustmentModal({
   const [error, setError] = React.useState<string | null>(null);
   const [successMsg, setSuccessMsg] = React.useState<string | null>(null);
 
+  // Synchronize active variant when modal opens or variants change
+  React.useEffect(() => {
+    if (open && variants.length > 0) {
+      setSelectedVariantId((prev) => {
+        const stillValid = variants.some((v) => v.id === prev);
+        return stillValid ? prev : variants[0].id;
+      });
+      setDeltaType("add");
+      setQuantity(1);
+      setReason("RESTOCK");
+      setNotes("");
+      setError(null);
+      setSuccessMsg(null);
+    }
+  }, [open, variants]);
+
   const activeVariantId = selectedVariantId || variants[0]?.id || "";
   const selectedVariant = variants.find((v) => v.id === activeVariantId);
   const isOneOfOne = selectedVariant?.isOneOfOne;

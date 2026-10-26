@@ -69,6 +69,11 @@ export function ProductVariantManager({
   const isAdmin = userRole === Role.ADMIN;
   const [variants, setVariants] = React.useState<ManagedVariant[]>(initialVariants);
 
+  // Sync state when parent provides updated initialVariants
+  React.useEffect(() => {
+    setVariants(initialVariants);
+  }, [initialVariants]);
+
   // Add modal state
   const [isAddOpen, setIsAddOpen] = React.useState(false);
   const [addSize, setAddSize] = React.useState("");
