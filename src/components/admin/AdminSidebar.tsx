@@ -26,6 +26,7 @@ interface AdminSidebarProps {
   userName: string;
   userEmail: string;
   storeName: string;
+  lowStockCount?: number;
 }
 
 interface NavItem {
@@ -122,6 +123,7 @@ export function AdminSidebar({
   userName,
   userEmail,
   storeName,
+  lowStockCount = 0,
 }: AdminSidebarProps) {
   const pathname = usePathname();
 
@@ -168,18 +170,26 @@ export function AdminSidebar({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
+                  className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all ${
                     isActive
                       ? "bg-amber-500/10 text-amber-900 border border-amber-500/30"
                       : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/80 border border-transparent"
                   }`}
                 >
-                  <Icon
-                    className={`h-4 w-4 ${
-                      isActive ? "text-amber-600" : "text-zinc-400"
-                    }`}
-                  />
-                  <span>{item.label}</span>
+                  <div className="flex items-center gap-3">
+                    <Icon
+                      className={`h-4 w-4 ${
+                        isActive ? "text-amber-600" : "text-zinc-400"
+                      }`}
+                    />
+                    <span>{item.label}</span>
+                  </div>
+
+                  {item.href === "/admin/products" && lowStockCount > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                      {lowStockCount} low
+                    </span>
+                  )}
                 </Link>
               );
             })}

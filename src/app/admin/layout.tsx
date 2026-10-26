@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { verifyAdminSession } from "@/lib/admin-auth";
 import { getStoreSettings } from "@/lib/settings";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,16 @@ export default async function AdminLayout({
     redirect("/");
   }
 
-  const storeSettings = await getStoreSettings();
+  const [storeSettings, lowStockCount] = await Promise.all([
+    getStoreSettings(),
+    prisma.productVariant.count({
+      where: {
+        stockQty: { lte: 1 },
+        isSold: false,
+        product: { status: "ACTIVE" },
+      },
+    }),
+  ]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-zinc-900 flex">
@@ -36,6 +46,7 @@ export default async function AdminLayout({
         userName={user.name || "Team Member"}
         userEmail={user.email}
         storeName={storeSettings.storeName}
+        lowStockCount={lowStockCount}
       />
 
       {/* Admin content viewport */}
