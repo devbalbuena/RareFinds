@@ -394,8 +394,21 @@ export function CatalogManagementTable({
               ) : (
                 brands.map((brand) => (
                   <tr key={brand.id} className="hover:bg-zinc-50/70 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-zinc-900 flex items-center gap-2">
-                      <span>{brand.name}</span>
+                    <td className="py-3.5 px-4 font-bold text-zinc-900">
+                      <div className="flex items-center gap-2.5">
+                        {brand.logoUrl ? (
+                          <img
+                            src={brand.logoUrl}
+                            alt={brand.name}
+                            className="w-7 h-7 rounded-lg object-contain bg-zinc-100 p-0.5 border border-zinc-200 shrink-0"
+                          />
+                        ) : (
+                          <div className="w-7 h-7 rounded-lg bg-zinc-100 text-zinc-500 border border-zinc-200 flex items-center justify-center text-[10px] font-bold font-mono shrink-0">
+                            {brand.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <span>{brand.name}</span>
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 text-zinc-500 font-mono text-[11px]">
                       {brand.slug}
@@ -475,7 +488,12 @@ export function CatalogManagementTable({
                 categories.map((cat) => (
                   <tr key={cat.id} className="hover:bg-zinc-50/70 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-zinc-900">
-                      {cat.name}
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 flex items-center justify-center text-xs shrink-0">
+                          <FolderTree className="w-3.5 h-3.5" />
+                        </div>
+                        <span>{cat.name}</span>
+                      </div>
                     </td>
                     <td className="py-3.5 px-4 text-zinc-500 font-mono text-[11px]">
                       {cat.slug}
@@ -581,6 +599,19 @@ export function CatalogManagementTable({
                 onChange={(e) => setBrandLogo(e.target.value)}
                 className="bg-white border-zinc-300 text-xs text-zinc-900"
               />
+              {brandLogo.trim() && (
+                <div className="flex items-center gap-2.5 p-2 rounded-xl bg-zinc-50 border border-zinc-200 mt-1">
+                  <img
+                    src={brandLogo.trim()}
+                    alt="Logo preview"
+                    className="w-8 h-8 rounded-lg object-contain bg-white border border-zinc-200 shrink-0"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLElement).style.display = "none";
+                    }}
+                  />
+                  <span className="text-[11px] text-zinc-500 font-medium">Logo URL Preview</span>
+                </div>
+              )}
             </div>
 
             <DialogFooter className="pt-2">
