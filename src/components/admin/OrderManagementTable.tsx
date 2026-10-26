@@ -27,6 +27,7 @@ import {
   PackageCheck,
   CreditCard,
   Ban,
+  Download,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -249,6 +250,63 @@ export function OrderManagementTable({
     }
   };
 
+  // Handle Orders CSV Export
+  const handleExportOrdersCSV = () => {
+    if (orders.length === 0) return;
+
+    const headers = [
+      "Order Number",
+      "Date",
+      "Customer Name",
+      "Email",
+      "Phone",
+      "Delivery Address",
+      "Carrier",
+      "Tracking Number",
+      "Status",
+      "Payment Method",
+      "Payment Status",
+      "Total (PHP)",
+    ];
+
+    const rows = orders.map((o) => {
+      const addr = o.shippingAddress;
+      const addrStr = addr
+        ? `${addr.street}${addr.apartment ? ` ${addr.apartment}` : ""}, ${addr.city}, ${addr.province} ${addr.postalCode}`
+        : "—";
+
+      return [
+        `"${o.orderNumber}"`,
+        new Date(o.createdAt).toISOString().split("T")[0],
+        `"${(o.customerName || "Customer").replace(/"/g, '""')}"`,
+        `"${o.customerEmail.replace(/"/g, '""')}"`,
+        `"${(o.customerPhone || "—").replace(/"/g, '""')}"`,
+        `"${addrStr.replace(/"/g, '""')}"`,
+        `"${(o.shippingCarrier || "Pending").replace(/"/g, '""')}"`,
+        `"${(o.trackingNumber || "None").replace(/"/g, '""')}"`,
+        o.status,
+        o.paymentMethod,
+        o.paymentStatus,
+        o.totalAmount.toFixed(2),
+      ];
+    });
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `rarefinds-orders-${statusFilter.toLowerCase()}-${new Date().toISOString().split("T")[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const getStatusBadge = (status: OrderStatus) => {
     switch (status) {
       case "PENDING":
@@ -445,6 +503,18 @@ export function OrderManagementTable({
             <option value="total_desc">Total (High to Low)</option>
             <option value="total_asc">Total (Low to High)</option>
           </select>
+
+          {/* Export Orders CSV */}
+          <button
+            type="button"
+            onClick={handleExportOrdersCSV}
+            disabled={orders.length === 0}
+            className="h-9 px-3.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer shrink-0"
+            title="Export filtered orders as CSV manifest"
+          >
+            <Download className="w-3.5 h-3.5 text-amber-400" />
+            <span>Export Orders CSV</span>
+          </button>
         </div>
       </div>
 
