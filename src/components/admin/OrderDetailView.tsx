@@ -27,6 +27,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
+import { getCarrierTrackingUrl } from "@/lib/couriers";
 import {
   updateOrderStatusAction,
   updateOrderTrackingAction,
@@ -255,29 +256,7 @@ export function OrderDetailView({
     },
   ];
 
-  // Helper for tracking links
-  function getTrackingUrl(c: string | null, num: string | null) {
-    if (!c || !num) return null;
-    const lower = c.toLowerCase();
-    if (lower.includes("lbc")) {
-      return `https://www.lbcexpress.com/track/?tracking_no=${encodeURIComponent(num)}`;
-    }
-    if (lower.includes("j&t") || lower.includes("jt")) {
-      return `https://www.jtexpress.ph/index/query/gzquery.html?bills=${encodeURIComponent(num)}`;
-    }
-    if (lower.includes("2go")) {
-      return `https://supplychain.2go.com.ph/track/track.asp?tin=${encodeURIComponent(num)}`;
-    }
-    if (lower.includes("dhl")) {
-      return `https://www.dhl.com/en/express/tracking.html?AWB=${encodeURIComponent(num)}`;
-    }
-    if (lower.includes("ninja")) {
-      return `https://www.ninjavan.co/en-ph/tracking?id=${encodeURIComponent(num)}`;
-    }
-    return null;
-  }
-
-  const trackingUrl = getTrackingUrl(order.shippingCarrier, order.trackingNumber);
+  const trackingUrl = getCarrierTrackingUrl(order.shippingCarrier, order.trackingNumber);
 
   // Action handlers
   async function handleStatusUpdate(e: React.FormEvent) {

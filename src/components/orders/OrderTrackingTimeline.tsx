@@ -25,6 +25,7 @@ import {
   confirmReceivedCustomerAction,
   reportOrderProblemAction,
 } from "@/actions/orders";
+import { getCarrierTrackingUrl } from "@/lib/couriers";
 
 interface OrderTrackingTimelineProps {
   orderId: string;
@@ -143,28 +144,7 @@ export function OrderTrackingTimeline({
     }
   }
 
-  function getCarrierUrl(carrier: string | null, tracking: string | null) {
-    if (!carrier || !tracking) return null;
-    const lower = carrier.toLowerCase();
-    if (lower.includes("lbc")) {
-      return `https://www.lbcexpress.com/track/?tracking_no=${encodeURIComponent(tracking)}`;
-    }
-    if (lower.includes("j&t") || lower.includes("jt")) {
-      return `https://www.jtexpress.ph/index/query/gzquery.html?bills=${encodeURIComponent(tracking)}`;
-    }
-    if (lower.includes("2go")) {
-      return `https://supplychain.2go.com.ph/track/track.asp?tin=${encodeURIComponent(tracking)}`;
-    }
-    if (lower.includes("dhl")) {
-      return `https://www.dhl.com/en/express/tracking.html?AWB=${encodeURIComponent(tracking)}`;
-    }
-    if (lower.includes("ninja")) {
-      return `https://www.ninjavan.co/en-ph/tracking?id=${encodeURIComponent(tracking)}`;
-    }
-    return null;
-  }
-
-  const carrierUrl = getCarrierUrl(shippingCarrier || null, trackingNumber || null);
+  const carrierUrl = getCarrierTrackingUrl(shippingCarrier || null, trackingNumber || null);
 
   const isDelivered = status === "DELIVERED";
   const isShipped = status === "SHIPPED" || isDelivered;
