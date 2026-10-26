@@ -17,6 +17,7 @@ import {
   X,
   CreditCard,
   Crown,
+  Download,
 } from "lucide-react";
 import { formatPrice } from "@/lib/utils";
 import {
@@ -110,6 +111,52 @@ export function CustomerManagementTable({
   const handleClearSearch = () => {
     setSearchTerm("");
     updateQuery({ search: null, page: "1" });
+  };
+
+  const handleExportCSV = () => {
+    if (initialCustomers.length === 0) return;
+
+    const headers = [
+      "Customer Name",
+      "Email",
+      "Primary Phone",
+      "Role",
+      "Collector Tier",
+      "Total Orders",
+      "Total Spent (PHP)",
+      "Last Order Date",
+      "Registered Date",
+    ];
+
+    const rows = initialCustomers.map((c) => {
+      const phone = c.addresses.find((a) => a.isDefault)?.phone || c.addresses[0]?.phone || "—";
+      return [
+        `"${(c.name || "Collector").replace(/"/g, '""')}"`,
+        `"${c.email.replace(/"/g, '""')}"`,
+        `"${phone.replace(/"/g, '""')}"`,
+        c.role,
+        c.collectorTier,
+        c.totalOrders,
+        c.totalSpent.toFixed(2),
+        c.lastOrderDate ? new Date(c.lastOrderDate).toISOString().split("T")[0] : "None",
+        new Date(c.createdAt).toISOString().split("T")[0],
+      ];
+    });
+
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute(
+      "download",
+      `rarefinds-collectors-${new Date().toISOString().split("T")[0]}.csv`
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -245,6 +292,18 @@ export function CustomerManagementTable({
                 <option value="oldest">Oldest Joined</option>
               </select>
             </div>
+
+            {/* Export CSV Button */}
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              disabled={initialCustomers.length === 0}
+              className="px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 text-white text-xs font-semibold flex items-center gap-1.5 transition shadow-2xs cursor-pointer"
+              title="Download customer directory as CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-amber-400" />
+              <span>Export CSV</span>
+            </button>
           </div>
         </div>
       </div>
