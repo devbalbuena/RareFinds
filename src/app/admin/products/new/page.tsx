@@ -27,23 +27,23 @@ export default async function NewProductPage() {
     <div className="p-6 sm:p-10 max-w-4xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs text-zinc-500">
-        <Link href="/admin" className="hover:text-white">
+        <Link href="/admin" className="hover:text-zinc-900 transition-colors">
           Dashboard
         </Link>
         <span>/</span>
-        <Link href="/admin/products" className="hover:text-white">
+        <Link href="/admin/products" className="hover:text-zinc-900 transition-colors">
           Sneakers
         </Link>
         <span>/</span>
-        <span className="text-zinc-300">New Sneaker</span>
+        <span className="text-zinc-900 font-semibold">New Sneaker</span>
       </div>
 
       <div className="space-y-1">
-        <h1 className="text-2xl font-black uppercase tracking-tight text-white flex items-center gap-2">
+        <h1 className="text-2xl font-black uppercase tracking-tight text-zinc-900 flex items-center gap-2">
           <Sparkles className="h-6 w-6 text-amber-500" />
           Add Sneaker to Vault
         </h1>
-        <p className="text-xs text-zinc-400">
+        <p className="text-xs text-zinc-500">
           Create a new sneaker entry. You can configure multiple size variants and upload high-res gallery images next.
         </p>
       </div>

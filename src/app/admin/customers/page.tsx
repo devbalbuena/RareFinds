@@ -48,24 +48,24 @@ export default async function AdminCustomersPage(props: AdminCustomersPageProps)
   return (
     <div className="p-6 sm:p-10 max-w-7xl mx-auto space-y-6">
       {/* Breadcrumb & Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-800">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-zinc-200">
         <div>
           <div className="flex items-center gap-2 text-xs text-zinc-500 mb-1">
-            <Link href="/admin" className="hover:text-white flex items-center gap-1">
+            <Link href="/admin" className="hover:text-zinc-900 transition-colors flex items-center gap-1">
               <ArrowLeft className="h-3 w-3" /> Dashboard
             </Link>
             <span>/</span>
-            <span className="text-zinc-300">Customers</span>
+            <span className="text-zinc-900 font-semibold">Customers</span>
           </div>
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 border border-purple-500/20">
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold font-mono tracking-tight text-white">
+              <h1 className="text-2xl font-bold font-mono tracking-tight text-zinc-900">
                 Customer & Collector Directory
               </h1>
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-zinc-500">
                 Track buyer lifetime values, spending tiers, order frequencies, and shipping profiles.
               </p>
             </div>
