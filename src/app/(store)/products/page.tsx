@@ -7,6 +7,7 @@ import { CatalogFilters } from "@/components/catalog/CatalogFilters";
 import { CatalogMobileFilterSheet } from "@/components/catalog/CatalogMobileFilterSheet";
 import { CatalogSortSelect } from "@/components/catalog/CatalogSortSelect";
 import { CatalogPagination } from "@/components/catalog/CatalogPagination";
+import { ActiveFilterChips } from "@/components/catalog/ActiveFilterChips";
 import {
   getCatalogFilterOptions,
   getFilteredProducts,
@@ -50,6 +51,16 @@ export default async function ProductsPage(props: ProductsPageProps) {
 
   const { products, totalCount, totalPages, currentPage } = catalogData;
 
+  const brandMap = filterOptions.brands.reduce<Record<string, string>>((acc, b) => {
+    acc[b.slug] = b.name;
+    return acc;
+  }, {});
+
+  const categoryMap = filterOptions.categories.reduce<Record<string, string>>((acc, c) => {
+    acc[c.slug] = c.name;
+    return acc;
+  }, {});
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
       {/* Catalog Title & Header Bar */}
@@ -84,6 +95,9 @@ export default async function ProductsPage(props: ProductsPageProps) {
 
         {/* Product Grid / Empty State */}
         <div className="lg:col-span-3 flex flex-col justify-between">
+          {/* Active Filter Chips */}
+          <ActiveFilterChips brandMap={brandMap} categoryMap={categoryMap} />
+
           {products.length > 0 ? (
             <div className="space-y-8">
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
