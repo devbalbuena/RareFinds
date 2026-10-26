@@ -395,6 +395,39 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                 />
               </div>
             </div>
+
+            {/* Live Checkout Logistics Preview */}
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 space-y-2.5 mt-4">
+              <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-emerald-900">
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Live Buyer Checkout Delivery Rates Preview</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-2xs">
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase">Metro Manila Express</div>
+                  <div className="text-base font-black font-mono text-zinc-900 mt-0.5">
+                    ₱{Number(formData.shippingFeeLocal || 0).toLocaleString("en-PH")}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 mt-1">Dedicated Same-Day Rider</div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-2xs">
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase">Provincial Air Express</div>
+                  <div className="text-base font-black font-mono text-zinc-900 mt-0.5">
+                    ₱{Number(formData.shippingFeeCourier || 0).toLocaleString("en-PH")}
+                  </div>
+                  <div className="text-[10px] text-zinc-500 mt-1">LBC / J&T Insured Flight</div>
+                </div>
+                <div className="bg-white p-3 rounded-lg border border-emerald-100 shadow-2xs">
+                  <div className="text-[10px] text-zinc-500 font-bold uppercase">Vault Store Pickup</div>
+                  <div className="text-base font-black font-mono text-emerald-700 mt-0.5">
+                    FREE
+                  </div>
+                  <div className="text-[10px] text-zinc-500 mt-1 truncate" title={formData.pickupAddress || "Not configured"}>
+                    {formData.pickupAddress ? "Pickup Available" : "Disabled (No Address)"}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -533,6 +566,39 @@ export function SettingsForm({ initialSettings }: SettingsFormProps) {
                   <p className="text-[10px] text-zinc-500">
                     Days after delivery before an untouched order auto-completes and releases vault escrow.
                   </p>
+                </div>
+              </div>
+
+              {/* Live Payment & Hold Safeguards Preview */}
+              <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 space-y-2.5 mt-4">
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-900">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Live Payment Safeguards &amp; Reservation Hold Preview</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="bg-white p-3 rounded-lg border border-purple-100 shadow-2xs">
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase">COD Availability</div>
+                    <div className={`text-sm font-black mt-0.5 ${formData.codEnabled ? "text-emerald-700" : "text-zinc-500"}`}>
+                      {formData.codEnabled ? "Enabled" : "Disabled"}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-1">
+                      {formData.codEnabled ? `Up to ₱${Number(formData.codMaxAmount || 0).toLocaleString("en-PH")}` : "Online payment required"}
+                    </div>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-purple-100 shadow-2xs">
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase">Bank / GCash Hold</div>
+                    <div className="text-sm font-black font-mono text-amber-700 mt-0.5">
+                      {formData.manualPaymentHoldMinutes} Minutes
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-1">Sneaker locked before auto-release</div>
+                  </div>
+                  <div className="bg-white p-3 rounded-lg border border-purple-100 shadow-2xs">
+                    <div className="text-[10px] text-zinc-500 font-bold uppercase">Auto-Complete Timer</div>
+                    <div className="text-sm font-black font-mono text-zinc-900 mt-0.5">
+                      {formData.autoCompleteDays} Days
+                    </div>
+                    <div className="text-[10px] text-zinc-500 mt-1">Post-delivery escrow settlement</div>
+                  </div>
                 </div>
               </div>
             </div>
