@@ -48,6 +48,11 @@ export default async function EditProductPage({ params }: PageProps) {
 
   const product = productRes.product;
 
+  const totalStock = product.variants.reduce((sum, v) => sum + v.stockQty, 0);
+  const activeSizesCount = product.variants.filter((v) => !v.isSold && v.stockQty > 0).length;
+  const isSoldOut = product.variants.length > 0 && activeSizesCount === 0;
+  const isLowStock = !isSoldOut && totalStock <= 2 && totalStock > 0;
+
   const initialVariants: ManagedVariant[] = product.variants.map((v) => ({
     id: v.id,
     size: v.size,
@@ -132,6 +137,37 @@ export default async function EditProductPage({ params }: PageProps) {
                 <span>•</span>
                 <span className="font-mono text-zinc-500">SKU: {product.sku}</span>
               </>
+            )}
+          </div>
+        </div>
+
+        {/* Inventory Summary Badge */}
+        <div className="flex flex-wrap sm:flex-col items-start sm:items-end gap-1.5 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-zinc-100">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-zinc-500 font-medium">Vault Total:</span>
+            <span className="text-sm font-black font-mono text-zinc-900">
+              {totalStock} {totalStock === 1 ? "pair" : "pairs"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {isSoldOut ? (
+              <Badge className="bg-rose-50 text-rose-700 border-rose-200 text-[10px] font-bold">
+                SOLD OUT
+              </Badge>
+            ) : isLowStock ? (
+              <Badge className="bg-amber-50 text-amber-800 border-amber-200 text-[10px] font-bold">
+                LOW STOCK ({totalStock} left)
+              </Badge>
+            ) : (
+              <Badge className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                IN STOCK ({activeSizesCount} {activeSizesCount === 1 ? "size" : "sizes"})
+              </Badge>
+            )}
+            {product.variants.some((v) => v.isOneOfOne) && (
+              <Badge className="bg-purple-50 text-purple-700 border-purple-200 text-[10px] font-bold">
+                1-OF-1 GRAIL
+              </Badge>
             )}
           </div>
         </div>
