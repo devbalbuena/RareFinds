@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Prisma } from "@prisma/client";
+import { formatDateTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -316,7 +317,7 @@ export default async function AdminAuditPage({ searchParams }: AuditPageProps) {
                 </tr>
               ) : (
                 logs.map((log) => {
-                  const dateFormatted = new Date(log.createdAt).toLocaleString("en-US", {
+                  const dateFormatted = formatDateTime(log.createdAt, {
                     month: "short",
                     day: "numeric",
                     year: "numeric",

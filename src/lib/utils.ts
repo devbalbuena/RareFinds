@@ -17,4 +17,28 @@ export function formatPrice(
 
   const symbol = currencySymbol === "PHP" ? "₱" : currencySymbol;
   return `${symbol}${formattedNumber}`;
+}export function formatDate(
+  date: Date | string | number | null | undefined,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  if (!date) return "—";
+  const d = typeof date === "string" || typeof date === "number" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-PH", options || { month: "short", day: "numeric", year: "numeric" });
+}
+
+export function formatDateTime(
+  date: Date | string | number | null | undefined,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  if (!date) return "—";
+  const d = typeof date === "string" || typeof date === "number" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleString("en-PH", options || {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

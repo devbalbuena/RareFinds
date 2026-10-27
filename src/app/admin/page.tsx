@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatDate } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -379,7 +380,7 @@ export default async function AdminDashboardPage() {
                     ₱{Number(ord.totalAmount).toLocaleString()}
                   </div>
                   <p className="text-[10px] text-zinc-400 font-mono">
-                    {new Date(ord.createdAt).toLocaleDateString()} via {ord.paymentMethod}
+                    {formatDate(ord.createdAt)} via {ord.paymentMethod}
                   </p>
                 </div>
               </div>

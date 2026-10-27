@@ -26,7 +26,7 @@ import {
   Store,
   ShieldAlert,
 } from "lucide-react";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatDateTime } from "@/lib/utils";
 import { getCarrierTrackingUrl } from "@/lib/couriers";
 import {
   updateOrderStatusAction,
@@ -1279,7 +1279,7 @@ export function OrderDetailView({
                   <div className="flex justify-between items-center pt-2 border-t border-zinc-100">
                     <span className="text-zinc-500">Settled On</span>
                     <span className="text-zinc-800 font-mono text-[11px]">
-                      {new Date(order.paidAt).toLocaleDateString()} {new Date(order.paidAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {formatDateTime(order.paidAt)}
                     </span>
                   </div>
                 )}

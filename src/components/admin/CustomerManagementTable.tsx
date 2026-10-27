@@ -19,7 +19,7 @@ import {
   Crown,
   Download,
 } from "lucide-react";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, formatDate } from "@/lib/utils";
 import {
   SerializedAdminCustomer,
   CustomerMetrics,
@@ -598,7 +598,7 @@ export function CustomerManagementTable({
                           {ord.orderNumber}
                         </div>
                         <div className="text-[11px] text-zinc-500 mt-0.5">
-                          {new Date(ord.createdAt).toLocaleDateString()} •{" "}
+                          {formatDate(ord.createdAt)} •{" "}
                           <span className="text-zinc-700 font-bold">
                             {ord.status}
                           </span>
