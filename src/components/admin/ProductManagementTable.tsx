@@ -77,6 +77,9 @@ export interface SerializedAdminProduct {
 
 interface ProductManagementTableProps {
   initialSearch?: string;
+  initialLowStock?: boolean;
+  initialStatus?: ProductStatus | "ALL";
+  initialBrandId?: string;
   initialProducts: SerializedAdminProduct[];
   initialTotal: number;
   initialPage: number;
@@ -88,6 +91,9 @@ interface ProductManagementTableProps {
 
 export function ProductManagementTable({
   initialSearch = "",
+  initialLowStock = false,
+  initialStatus = "ALL",
+  initialBrandId = "",
   initialProducts,
   initialTotal,
   initialPage,
@@ -100,10 +106,10 @@ export function ProductManagementTable({
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = React.useState(initialSearch);
-  const [statusFilter, setStatusFilter] = React.useState<ProductStatus | "ALL">("ALL");
-  const [brandFilter, setBrandFilter] = React.useState<string>("");
+  const [statusFilter, setStatusFilter] = React.useState<ProductStatus | "ALL">(initialStatus);
+  const [brandFilter, setBrandFilter] = React.useState<string>(initialBrandId);
   const [categoryFilter, setCategoryFilter] = React.useState<string>("");
-  const [lowStockFilter, setLowStockFilter] = React.useState(false);
+  const [lowStockFilter, setLowStockFilter] = React.useState(initialLowStock);
   const [soldFilter, setSoldFilter] = React.useState(false);
   const [sortBy, setSortBy] = React.useState<
     "newest" | "oldest" | "title_asc" | "title_desc" | "price_asc" | "price_desc"
