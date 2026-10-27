@@ -126,6 +126,8 @@ export async function updateStoreSettingsAction(input: UpdateSettingsInput) {
     try {
       revalidatePath("/admin/settings");
       revalidatePath("/checkout");
+      revalidatePath("/products");
+      revalidatePath("/shipping-policy");
       revalidatePath("/");
     } catch {
       // Graceful fallback in non-request test contexts
