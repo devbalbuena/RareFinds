@@ -11,6 +11,7 @@ import {
   Search,
   CheckCircle,
   AlertCircle,
+  AlertTriangle,
   Loader2,
   UserX,
   UserCheck,
@@ -60,6 +61,9 @@ export function UsersManagementTable({
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  // Deactivation confirmation modal state
+  const [deactivateConfirmUser, setDeactivateConfirmUser] = React.useState<SerializedUser | null>(null);
 
   // Filtered users
   const filteredUsers = users.filter((u) => {
@@ -280,7 +284,13 @@ export function UsersManagementTable({
                             size="sm"
                             variant={u.isActive ? "outline" : "default"}
                             disabled={isPending}
-                            onClick={() => handleToggleActive(u.id, u.isActive)}
+                            onClick={() => {
+                              if (u.isActive) {
+                                setDeactivateConfirmUser(u);
+                              } else {
+                                handleToggleActive(u.id, false);
+                              }
+                            }}
                             className={`h-8 text-[11px] font-bold cursor-pointer shadow-2xs ${
                               u.isActive
                                 ? "border-zinc-200 bg-white text-zinc-700 hover:text-rose-700 hover:bg-rose-50 hover:border-rose-200"
@@ -422,6 +432,51 @@ export function UsersManagementTable({
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Deactivation Confirmation Modal */}
+      {deactivateConfirmUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
+          <div className="w-full max-w-md bg-white border border-zinc-200 rounded-2xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 text-zinc-900">
+            <div className="flex items-center gap-2.5 text-rose-600">
+              <AlertTriangle className="h-5 w-5" />
+              <h3 className="font-bold text-sm text-zinc-900">
+                Confirm Account Deactivation
+              </h3>
+            </div>
+            <p className="text-xs text-zinc-600 leading-relaxed">
+              Are you sure you want to deactivate <strong className="text-zinc-900 font-bold">{deactivateConfirmUser.name || deactivateConfirmUser.email}</strong> ({deactivateConfirmUser.role})? 
+              This user will immediately be barred from signing into the RareFinds vault portal.
+            </p>
+            <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-zinc-100">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setDeactivateConfirmUser(null)}
+                disabled={isPending}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={isPending}
+                onClick={async () => {
+                  const target = deactivateConfirmUser;
+                  setDeactivateConfirmUser(null);
+                  if (target) {
+                    await handleToggleActive(target.id, true);
+                  }
+                }}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs"
+              >
+                {isPending ? "Deactivating..." : "Deactivate Account"}
+              </Button>
+            </div>
           </div>
         </div>
       )}
