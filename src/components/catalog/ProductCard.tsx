@@ -118,6 +118,9 @@ export function ProductCard({ product }: ProductCardProps) {
         {/* Sizing & Price */}
         <div className="border-t pt-2.5 flex items-baseline justify-between mt-auto">
           <div className="text-xs text-muted-foreground">
+            {product.variants.length === 0 && (
+              <span className="italic text-zinc-400">Vault Allocation Pending</span>
+            )}
             {product.variants[0]?.isOneOfOne && (
               <span className="font-medium text-zinc-700 dark:text-zinc-300">
                 {product.variants[0]?.size} • 1-of-1
@@ -129,9 +132,15 @@ export function ProductCard({ product }: ProductCardProps) {
           </div>
 
           <div className="text-sm font-bold text-foreground">
-            {minPrice === maxPrice
-              ? formatPrice(minPrice)
-              : `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`}
+            {product.variants.length === 0 ? (
+              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+                Vault Pricing Soon
+              </span>
+            ) : minPrice === maxPrice ? (
+              formatPrice(minPrice)
+            ) : (
+              `${formatPrice(minPrice)} - ${formatPrice(maxPrice)}`
+            )}
           </div>
         </div>
       </div>
