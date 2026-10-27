@@ -177,15 +177,15 @@ export async function placeOrderAction(input: PlaceOrderInput) {
       }
     }
   } else if (deliveryMethod === "PICKUP") {
-    // If pickup and no custom address was specified, use store pickup address
+    // Store vault pickup: use store vault location in Taguig City, Metro Manila
     shippingAddressSnapshot = {
       fullName: customerName,
       phone: "09000000000",
-      street: settings.pickupAddress || "RareFinds Store Vault",
-      apartment: "Store Pickup Counter",
-      city: "Pickup",
-      province: "Pickup",
-      postalCode: "0000",
+      street: settings.pickupAddress || "RareFinds Vault - Bonifacio High Street",
+      apartment: "Vault Store Pickup Counter",
+      city: "Taguig City",
+      province: "Metro Manila",
+      postalCode: "1634",
       country: "Philippines",
     };
   } else {
@@ -193,6 +193,7 @@ export async function placeOrderAction(input: PlaceOrderInput) {
   }
 
   // 3. Geographical Area Enforcement for Local Delivery and Vault Pickup
+  // Vault pickup takes place at the physical vault in Metro Manila
   if (deliveryMethod === "PICKUP") {
     const zone = getRegionZone(shippingAddressSnapshot.province);
     if (zone.zoneKey !== "NCR") {
