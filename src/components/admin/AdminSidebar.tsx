@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -126,6 +126,7 @@ export function AdminSidebar({
   lowStockCount = 0,
 }: AdminSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
 
   // Filter categories and items by active database role permissions
   const visibleCategories = NAV_CATEGORIES.map((category) => ({
@@ -186,9 +187,18 @@ export function AdminSidebar({
                   </div>
 
                   {item.href === "/admin/products" && lowStockCount > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        router.push("/admin/products?lowStock=true");
+                      }}
+                      title="Filter low stock sneakers immediately"
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 transition-colors cursor-pointer"
+                    >
                       {lowStockCount} low
-                    </span>
+                    </button>
                   )}
                 </Link>
               );
