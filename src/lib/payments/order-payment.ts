@@ -136,6 +136,9 @@ export async function cancelCustomerOrder(
     const order = await tx.order.findUnique({
       where: { id: orderId },
       include: {
+        user: {
+          select: { id: true, email: true, name: true },
+        },
         items: {
           include: {
             variant: true,
@@ -204,6 +207,24 @@ export async function cancelCustomerOrder(
       data: {
         status: OrderStatus.CANCELLED,
         cancelledAt: new Date(),
+      },
+    });
+
+    // Record cancellation event in immutable audit log
+    await tx.auditLog.create({
+      data: {
+        userId: order.userId,
+        userEmail: order.user?.email || "customer@order",
+        action: "ORDER_CANCELLED",
+        entityType: "Order",
+        entityId: orderId,
+        details: {
+          orderNumber: order.orderNumber,
+          previousStatus: order.status,
+          newStatus: OrderStatus.CANCELLED,
+          cancelledBy: "CUSTOMER",
+          restoredItemsCount: order.items.length,
+        },
       },
     });
 
