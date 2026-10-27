@@ -154,20 +154,18 @@ export function CheckoutForm({
   React.useEffect(() => {
     if (isAddressInManila) {
       // Address is in Manila: Courier is disabled; auto-select Local Delivery if Courier was chosen
-      if (deliveryMethod === "COURIER") {
-        setDeliveryMethod("LOCAL_DELIVERY");
-      }
+      setDeliveryMethod((prev) => (prev === "COURIER" ? "LOCAL_DELIVERY" : prev));
     } else {
       // Address is outside Manila: Local Express & Self Pickup are disabled; auto-select Courier
-      if (deliveryMethod === "LOCAL_DELIVERY" || deliveryMethod === "PICKUP") {
-        setDeliveryMethod("COURIER");
-      }
+      setDeliveryMethod((prev) =>
+        prev === "LOCAL_DELIVERY" || prev === "PICKUP" ? "COURIER" : prev
+      );
       // COD is not allowed outside Manila; auto-switch to online payment
-      if (paymentMethod === "COD") {
-        setPaymentMethod(paymentMode === "demo" ? "GCASH" : "CARD");
-      }
+      setPaymentMethod((prev) =>
+        prev === "COD" ? (paymentMode === "demo" ? "GCASH" : "CARD") : prev
+      );
     }
-  }, [isAddressInManila, deliveryMethod, paymentMethod, paymentMode]);
+  }, [isAddressInManila, paymentMode]);
 
   // Dynamic calculations for Courier & Local Express
   const courierCalc = React.useMemo(() => {
